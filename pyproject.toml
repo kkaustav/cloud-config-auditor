@@ -13,7 +13,11 @@ dependencies = [
     "pydantic>=2.0.0",
     "boto3>=1.26.0",
     "openai>=1.0.0",
+    "openenv-core>=0.2.0",
 ]
+
+[project.scripts]
+server = "server.app:main"
 
 [project.urls]
 Homepage = "https://huggingface.co/spaces/kkaustav/cloud-config-auditor"
