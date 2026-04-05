@@ -1,0 +1,13 @@
+name: aws-security-auditor
+version: 1.0.0
+description: An OpenEnv-compatible RL environment for training AI agents to audit AWS cloud infrastructure configurations.
+mode: simulation
+profile: openenv-http/1.x
+endpoints:
+  reset: /reset
+  step: /step
+  state: /state
+  health: /health
+  schema: /schema
+  metadata: /metadata
+  mcp: /mcp
