@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "aws-security-auditor"
+version = "1.0.0"
+description = "An OpenEnv-compatible RL environment for training AI agents to audit AWS cloud infrastructure configurations."
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "pydantic>=2.0.0",
+    "boto3>=1.26.0",
+    "openai>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://huggingface.co/spaces/kkaustav/cloud-config-auditor"
+Repository = "https://github.com/kkaustav/cloud-config-auditor"
