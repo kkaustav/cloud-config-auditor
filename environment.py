@@ -100,8 +100,72 @@ async def state():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "environment": "aws-security-auditor", "version": "1.0.0"}
+    return {"status": "healthy", "environment": "aws-security-auditor", "version": "1.0.0"}
 
 @app.get("/tasks")
 async def list_tasks():
     return {"tasks": [{"name": t["name"], "difficulty": t["difficulty"], "max_steps": t["max_steps"]} for t in TASKS.values()]}
+
+@app.get("/metadata")
+async def metadata():
+    return {
+        "name": "aws-security-auditor",
+        "description": "An OpenEnv-compatible RL environment for training AI agents to audit AWS cloud infrastructure configurations.",
+        "version": "1.0.0",
+        "tasks": list(TASKS.keys())
+    }
+
+@app.get("/schema")
+async def schema():
+    return {
+        "action": {
+            "type": "object",
+            "properties": {
+                "findings": {"type": "array", "items": {"type": "string"}},
+                "severity": {"type": "array", "items": {"type": "string"}},
+                "recommendations": {"type": "array", "items": {"type": "string"}},
+                "config_patch": {"type": "object"}
+            }
+        },
+        "observation": {
+            "type": "object",
+            "properties": {
+                "config": {"type": "string"},
+                "task_description": {"type": "string"},
+                "step": {"type": "integer"},
+                "max_steps": {"type": "integer"},
+                "last_reward": {"type": "number"},
+                "feedback": {"type": "string"},
+                "task_name": {"type": "string"},
+                "difficulty": {"type": "string"}
+            }
+        },
+        "state": {
+            "type": "object",
+            "properties": {
+                "episode_id": {"type": "string"},
+                "step": {"type": "integer"},
+                "task_name": {"type": "string"},
+                "difficulty": {"type": "string"},
+                "total_reward": {"type": "number"},
+                "best_reward": {"type": "number"},
+                "done": {"type": "boolean"}
+            }
+        }
+    }
+
+@app.post("/mcp")
+async def mcp(request: dict):
+    method = request.get("method", "")
+    req_id = request.get("id", 1)
+    if method == "tools/list":
+        result = {"tools": [
+            {"name": "reset", "description": "Reset environment and start a new episode"},
+            {"name": "step",  "description": "Submit audit findings and get reward"},
+            {"name": "state", "description": "Get current episode state"}
+        ]}
+    elif method == "tools/call":
+        result = {"content": [{"type": "text", "text": "Use /reset, /step, /state endpoints directly."}]}
+    else:
+        result = {"message": "OpenEnv MCP interface ready"}
+    return {"jsonrpc": "2.0", "id": req_id, "result": result}
