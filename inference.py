@@ -9,7 +9,7 @@ ENV_BASE_URL      = os.getenv("ENV_BASE_URL", "http://localhost:7860").rstrip("/
 BENCHMARK         = "aws-security-auditor"
 MAX_STEPS         = 5
 TEMPERATURE       = 0.2
-MAX_TOKENS        = 700
+MAX_TOKENS        = 1200
 SUCCESS_THRESHOLD = 0.55
 TASKS_TO_RUN      = ["easy_security_group", "medium_s3_policy", "hard_iam_vpc"]
 
