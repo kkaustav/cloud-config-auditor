@@ -145,13 +145,19 @@ def grade_easy(findings, severity, recommendations, config_patch):
 
 def grade_medium(findings, severity, recommendations, config_patch):
     combined = " ".join(findings).lower()
+    rec_text = " ".join(recommendations).lower()
+    sev_text = " ".join(severity).lower()
     issues   = TASKS["medium_s3_policy"]["issues"]
     bd = {}
     bd["public_access_flag"]  = 0.20 if _contains(combined, issues["public_access"]) else 0.0
     bd["versioning_flag"]     = 0.15 if _contains(combined, issues["versioning"]) else 0.0
-    bd["encryption_flag"]     = 0.25 if _contains(combined, issues["encryption"]) else 0.0
-    bd["wildcard_principal"]  = 0.25 if _contains(combined, issues["wildcard_princ"]) else 0.0
+    bd["encryption_flag"]     = 0.20 if _contains(combined, issues["encryption"]) else 0.0
+    wildcard_expanded = issues["wildcard_princ"] + ["principal", "public read", "public write", "open access", "unrestricted", "allow *", "overly permissive"]
+    bd["wildcard_principal"]  = 0.20 if _contains(combined, wildcard_expanded) else 0.0
     bd["public_write_delete"] = 0.10 if _contains(combined, issues["write_delete_pub"]) else 0.0
+    rec_keywords = ["enable versioning", "enable encryption", "block public", "restrict", "kms", "least privilege", "mfa delete", "object lock"]
+    bd["rec_quality"]   = 0.05 if _contains(rec_text, rec_keywords) else 0.0
+    bd["severity_bonus"] = 0.05 if "high" in sev_text or "critical" in sev_text else 0.0
     if config_patch:
         patch_str = json.dumps(config_patch).lower()
         bd["patch_bonus"] = 0.05 if any(k in patch_str for k in ["aes256","kms"]) and '"*"' not in patch_str else 0.0
