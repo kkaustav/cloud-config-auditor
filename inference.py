@@ -14,14 +14,14 @@ SUCCESS_THRESHOLD = 0.55
 TASKS_TO_RUN      = ["easy_security_group", "medium_s3_policy", "hard_iam_vpc"]
 
 def log_start(task, env, model):
-    print(f"START task={task} env={env} model={model}", flush=True)
+    print(f"[START] task={task} env={env} model={model}", flush=True)
 
 def log_step(step, action, reward, done, error=None):
-    print(f"STEP step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={error or 'null'}", flush=True)
+    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={error or 'null'}", flush=True)
 
-def log_end(success, steps, score, rewards):
+def log_end(task, success, steps, score, rewards):
     r_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"END success={str(success).lower()} steps={steps} score={score:.3f} rewards={r_str}", flush=True)
+    print(f"[END] task={task} success={str(success).lower()} steps={steps} score={score:.3f} rewards={r_str}", flush=True)
 
 def _post(path, body):
     url  = f"{ENV_BASE_URL}{path}"
@@ -90,7 +90,7 @@ async def run_task(client, task_name):
         print(f"[DEBUG] Task {task_name} failed: {e}", flush=True)
     finally:
         final_score = max(rewards) if rewards else 0.0
-        log_end(success=success, steps=steps_taken, score=final_score, rewards=rewards)
+        log_end(task=task_name, success=success, steps=steps_taken, score=final_score, rewards=rewards)
 
 async def main():
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
