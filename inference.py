@@ -21,7 +21,11 @@ def log_step(step, action, reward, done, error=None):
 
 def log_end(task, success, steps, score, rewards):
     r_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] task={task} success={str(success).lower()} steps={steps} score={score:.3f} rewards={r_str}", flush=True)
+    print(
+        f"[END] task={task} success={str(success).lower()} steps={steps} "
+        f"score={score:.3f} rewards={r_str}",
+        flush=True,
+    )
 
 def _post(path, body):
     url  = f"{ENV_BASE_URL}{path}"
