@@ -141,14 +141,11 @@ def grade_easy(findings, severity, recommendations, config_patch):
         bd["patch_bonus"] = 0.10 if "22" not in patch_str and "3389" not in patch_str else 0.0
     else:
         bd["patch_bonus"] = 0.0
-
     score = sum(bd.values())
     score = max(0.0, min(1.0, score))
     score = round(score, 2)
-    if score <= 0.0:
-        score = 0.01
-    elif score >= 1.0:
-        score = 0.99
+    if score <= 0.0: score = 0.01
+    elif score >= 1.0: score = 0.99
     return score, bd
 
 def grade_medium(findings, severity, recommendations, config_patch):
@@ -171,14 +168,11 @@ def grade_medium(findings, severity, recommendations, config_patch):
         bd["patch_bonus"] = 0.05 if any(k in patch_str for k in ["aes256","kms"]) and '"*"' not in patch_str else 0.0
     else:
         bd["patch_bonus"] = 0.0
-
     score = sum(bd.values())
     score = max(0.0, min(1.0, score))
     score = round(score, 2)
-    if score <= 0.0:
-        score = 0.01
-    elif score >= 1.0:
-        score = 0.99
+    if score <= 0.0: score = 0.01
+    elif score >= 1.0: score = 0.99
     return score, bd
 
 def grade_hard(findings, severity, recommendations, config_patch):
@@ -201,12 +195,9 @@ def grade_hard(findings, severity, recommendations, config_patch):
         bd["patch_bonus"] = 0.08 if '"flowlogsenabled": true' in patch_str and '"action": "*"' not in patch_str else 0.0
     else:
         bd["patch_bonus"] = 0.0
-
     score = sum(bd.values())
     score = max(0.0, min(1.0, score))
     score = round(score, 2)
-    if score <= 0.0:
-        score = 0.01
-    elif score >= 1.0:
-        score = 0.99
+    if score <= 0.0: score = 0.01
+    elif score >= 1.0: score = 0.99
     return score, bd

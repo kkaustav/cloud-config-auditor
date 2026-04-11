@@ -37,7 +37,10 @@ class EpisodeState(BaseModel):
     best_reward: float
     done: bool
 
-_episode: Dict[str, Any] = {"id": None, "task": None, "step": 0, "done": False, "rewards": [], "last_reward": 0.0}
+_episode: Dict[str, Any] = {
+    "id": None, "task": None, "step": 0,
+    "done": False, "rewards": [], "last_reward": 0.0
+}
 
 def _build_observation(task, step, reward, feedback):
     return AuditObservation(
@@ -59,7 +62,10 @@ async def reset(task: str = Query(default="easy_security_group")):
     global _episode
     task_name = task if task in TASKS else TASK_SEQUENCE[0]
     task_data = TASKS[task_name]
-    _episode  = {"id": str(uuid.uuid4()), "task": task_data, "step": 0, "done": False, "rewards": [], "last_reward": 0.0}
+    _episode  = {
+        "id": str(uuid.uuid4()), "task": task_data,
+        "step": 0, "done": False, "rewards": [], "last_reward": 0.0
+    }
     obs = _build_observation(task_data, 0, 0.0, None)
     return StepResult(observation=obs, reward=0.0, done=False, info={"task": task_name})
 
@@ -104,7 +110,12 @@ async def health():
 
 @app.get("/tasks")
 async def list_tasks():
-    return {"tasks": [{"name": t["name"], "difficulty": t["difficulty"], "max_steps": t["max_steps"]} for t in TASKS.values()]}
+    return {
+        "tasks": [
+            {"name": t["name"], "difficulty": t["difficulty"], "max_steps": t["max_steps"]}
+            for t in TASKS.values()
+        ]
+    }
 
 @app.get("/metadata")
 async def metadata():
@@ -121,35 +132,35 @@ async def schema():
         "action": {
             "type": "object",
             "properties": {
-                "findings": {"type": "array", "items": {"type": "string"}},
-                "severity": {"type": "array", "items": {"type": "string"}},
+                "findings":        {"type": "array", "items": {"type": "string"}},
+                "severity":        {"type": "array", "items": {"type": "string"}},
                 "recommendations": {"type": "array", "items": {"type": "string"}},
-                "config_patch": {"type": "object"}
+                "config_patch":    {"type": "object"}
             }
         },
         "observation": {
             "type": "object",
             "properties": {
-                "config": {"type": "string"},
+                "config":           {"type": "string"},
                 "task_description": {"type": "string"},
-                "step": {"type": "integer"},
-                "max_steps": {"type": "integer"},
-                "last_reward": {"type": "number"},
-                "feedback": {"type": "string"},
-                "task_name": {"type": "string"},
-                "difficulty": {"type": "string"}
+                "step":             {"type": "integer"},
+                "max_steps":        {"type": "integer"},
+                "last_reward":      {"type": "number"},
+                "feedback":         {"type": "string"},
+                "task_name":        {"type": "string"},
+                "difficulty":       {"type": "string"}
             }
         },
         "state": {
             "type": "object",
             "properties": {
-                "episode_id": {"type": "string"},
-                "step": {"type": "integer"},
-                "task_name": {"type": "string"},
-                "difficulty": {"type": "string"},
+                "episode_id":   {"type": "string"},
+                "step":         {"type": "integer"},
+                "task_name":    {"type": "string"},
+                "difficulty":   {"type": "string"},
                 "total_reward": {"type": "number"},
-                "best_reward": {"type": "number"},
-                "done": {"type": "boolean"}
+                "best_reward":  {"type": "number"},
+                "done":         {"type": "boolean"}
             }
         }
     }
