@@ -3,4 +3,4 @@ nohup.out
 .env
 **/*.env
 secrets/train_colab.ipynb
-
+secrets/
