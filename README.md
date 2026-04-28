@@ -1,11 +1,13 @@
-
+---
 Project Title: Cloud Config Auditor
 -
 emoji: 🔐
 colorFrom: blue
 colorTo: green
 sdk: docker
+app_file: environment.py
 pinned: false
+---
 
 AWS Security Auditor
 -
