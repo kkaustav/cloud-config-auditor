@@ -3,3 +3,6 @@ uvicorn[standard]==0.30.6
 pydantic==2.7.4
 openai>=1.30.0
 openenv-core
+unsloth
+torch
+requests
