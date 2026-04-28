@@ -5,6 +5,7 @@ colorFrom: blue
 colorTo: green
 sdk: docker
 pinned: false
+
 AWS Security Auditor
 🏆 Built for the Meta PyTorch OpenEnv Hackathon x Scaler School of Technology
 In collaboration with Meta AI, PyTorch, and Hugging Face | April 2026
