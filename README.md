@@ -1,6 +1,5 @@
 ---
 Project Title: Cloud Config Auditor
--
 emoji: 🔐
 colorFrom: blue
 colorTo: green
