@@ -25,8 +25,6 @@ CURRICULUM   = [
     "easy_security_group",
     "medium_s3_policy",
     "hard_iam_vpc",
-    "medium_lambda_iam",
-    "hard_rds_cloudtrail",
 ]
 
 # ── Environment Client ─────────────────────────────────────────────────────────
