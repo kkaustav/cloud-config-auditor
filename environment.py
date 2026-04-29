@@ -2,40 +2,44 @@ import uuid, json
 from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, Query
 from pydantic import BaseModel, Field
-from tasks import TASKS, TASK_SEQUENCE, grade_easy, grade_medium, grade_hard
+from tasks import (
+    TASKS, TASK_SEQUENCE,
+    grade_easy, grade_medium, grade_hard,
+    grade_medium_lambda, grade_hard_rds     # NEW
+)
 
 app = FastAPI(title="AWS Security Auditor", version="1.0.0")
 
 class AuditAction(BaseModel):
-    findings: List[str] = Field(...)
-    severity: List[str] = Field(default=[])
+    findings:        List[str] = Field(...)
+    severity:        List[str] = Field(default=[])
     recommendations: List[str] = Field(default=[])
-    config_patch: dict = Field(default={})
+    config_patch:    dict      = Field(default={})
 
 class AuditObservation(BaseModel):
-    config: str
+    config:           str
     task_description: str
-    step: int
-    max_steps: int
-    last_reward: float
-    feedback: Optional[str]
-    task_name: str
-    difficulty: str
+    step:             int
+    max_steps:        int
+    last_reward:      float
+    feedback:         Optional[str]
+    task_name:        str
+    difficulty:       str
 
 class StepResult(BaseModel):
     observation: AuditObservation
-    reward: float
-    done: bool
-    info: Dict[str, Any] = {}
+    reward:      float
+    done:        bool
+    info:        Dict[str, Any] = {}
 
 class EpisodeState(BaseModel):
-    episode_id: str
-    step: int
-    task_name: str
-    difficulty: str
+    episode_id:   str
+    step:         int
+    task_name:    str
+    difficulty:   str
     total_reward: float
-    best_reward: float
-    done: bool
+    best_reward:  float
+    done:         bool
 
 _episode: Dict[str, Any] = {
     "id": None, "task": None, "step": 0,
@@ -76,15 +80,23 @@ async def step(action: AuditAction):
         task_data = TASKS[TASK_SEQUENCE[0]]
         obs = _build_observation(task_data, 0, 0.0, "Call /reset first.")
         return StepResult(observation=obs, reward=0.0, done=True, info={"error": "not started"})
+
     _episode["step"] += 1
     task_data = _episode["task"]
     cur_step  = _episode["step"]
+
+    # ── Grading router ──────────────────────────────────────────────────────
     if task_data["name"] == "easy_security_group":
         reward, breakdown = grade_easy(action.findings, action.severity, action.recommendations, action.config_patch)
     elif task_data["name"] == "medium_s3_policy":
         reward, breakdown = grade_medium(action.findings, action.severity, action.recommendations, action.config_patch)
+    elif task_data["name"] == "medium_lambda_iam":
+        reward, breakdown = grade_medium_lambda(action.findings, action.severity, action.recommendations, action.config_patch)
+    elif task_data["name"] == "hard_rds_cloudtrail":
+        reward, breakdown = grade_hard_rds(action.findings, action.severity, action.recommendations, action.config_patch)
     else:
         reward, breakdown = grade_hard(action.findings, action.severity, action.recommendations, action.config_patch)
+
     _episode["rewards"].append(reward)
     _episode["last_reward"] = reward
     done = (reward >= 0.85) or (cur_step >= task_data["max_steps"])
