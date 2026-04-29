@@ -13,16 +13,19 @@ from unsloth import FastLanguageModel
 # ── Config ─────────────────────────────────────────────────────────────────────
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
 HF_TOKEN     = os.getenv("HF_TOKEN", "")
-MODEL_NAME   = os.getenv("MODEL_NAME", "unsloth/Qwen2.5-7B-Instruct-bnb-4bit")
+MODEL_NAME   = os.getenv("MODEL_NAME", "unsloth/Qwen2.5-3B-Instruct-bnb-4bit")
 OUTPUT_DIR   = os.getenv("OUTPUT_DIR", "./grpo_output")
 MAX_SEQ_LEN  = 2048
 LORA_RANK    = 16
-CURRICULUM   = ["easy_security_group", "medium_s3_policy", "hard_iam_vpc"]
+CURRICULUM   = [
+    "easy_security_group",
+    "medium_s3_policy",
+    "hard_iam_vpc",
+    "medium_lambda_iam",       # NEW
+    "hard_rds_cloudtrail",     # NEW
+]
 
 # ── Environment Client ─────────────────────────────────────────────────────────
-# /reset uses query param ?task=   (NOT json body)
-# /step  uses AuditAction body     (findings, severity, recommendations, config_patch)
-
 def env_reset(task: str) -> dict:
     r = requests.post(f"{ENV_BASE_URL}/reset?task={task}", timeout=30)
     r.raise_for_status()
@@ -71,12 +74,9 @@ def build_prompt(config: str, task_description: str) -> str:
 
 # ── Response Parser ────────────────────────────────────────────────────────────
 def parse_response(text: str) -> dict:
-    """Parse model JSON output into AuditAction fields. Falls back gracefully."""
     try:
-        # Try direct JSON parse first
         data = json.loads(text.strip())
     except Exception:
-        # Try to extract JSON block from response
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             try:
@@ -99,14 +99,12 @@ def reward_fn(completions: list, prompts: list = None, **kwargs) -> list:
     dataset_ref = kwargs.get("dataset_ref", [])
 
     for i, completion in enumerate(completions):
-        # Anti-hacking: reject empty or too-short responses
         if len(completion.strip()) < 30:
             rewards.append(0.0)
             continue
 
         parsed = parse_response(completion)
 
-        # Anti-hacking: no empty findings list
         if not parsed["findings"]:
             rewards.append(0.01)
             continue
@@ -122,7 +120,6 @@ def reward_fn(completions: list, prompts: list = None, **kwargs) -> list:
             )
             base_reward = float(result.get("reward", 0.0))
 
-            # Format compliance bonus
             format_bonus = 0.0
             if parsed["findings"]:        format_bonus += 0.02
             if parsed["severity"]:        format_bonus += 0.02
@@ -132,7 +129,6 @@ def reward_fn(completions: list, prompts: list = None, **kwargs) -> list:
             if all(s in valid_sev for s in parsed["severity"]):
                 format_bonus += 0.02
 
-            # Anti-hacking penalty for vague responses
             penalty = 0.0
             vague = ["review your settings", "consult aws docs", "see documentation"]
             if any(v in " ".join(parsed["findings"]).lower() for v in vague):
@@ -153,12 +149,10 @@ def build_dataset(n_per_task: int = 20) -> Dataset:
     for task in CURRICULUM:
         for _ in range(n_per_task):
             try:
-                result   = env_reset(task)
-                obs      = result.get("observation", {})
-                config   = obs.get("config", "")
-                desc     = obs.get("task_description", task)
+                result = env_reset(task)
+                obs    = result.get("observation", {})
                 records.append({
-                    "prompt":    build_prompt(config, desc),
+                    "prompt":    build_prompt(obs.get("config", ""), obs.get("task_description", task)),
                     "task_name": task,
                 })
             except Exception as e:
@@ -175,7 +169,7 @@ def evaluate(model, tokenizer, label: str, n: int = 3) -> dict:
             try:
                 result  = env_reset(task)
                 obs     = result.get("observation", {})
-                prompt  = build_prompt(obs.get("config",""), obs.get("task_description", task))
+                prompt  = build_prompt(obs.get("config", ""), obs.get("task_description", task))
                 inputs  = tokenizer(prompt, return_tensors="pt").to("cuda")
                 with torch.no_grad():
                     out = model.generate(
@@ -224,19 +218,16 @@ def main():
         use_gradient_checkpointing="unsloth", random_state=42,
     )
 
-    # Baseline before training
     FastLanguageModel.for_inference(model)
     baseline = evaluate(model, tokenizer, "BASELINE (pre-training)")
     with open(f"{OUTPUT_DIR}/baseline_scores.json", "w") as f:
         json.dump(baseline, f, indent=2)
 
-    # Dataset
     FastLanguageModel.for_training(model)
     print("\nBuilding dataset...")
     dataset = build_dataset(n_per_task=20)
     print(f"Dataset: {len(dataset)} prompts")
 
-    # GRPO training
     grpo_args = GRPOConfig(
         output_dir=OUTPUT_DIR,
         num_train_epochs=3,
@@ -267,11 +258,9 @@ def main():
     print("\n🚀 Starting GRPO training...")
     trainer.train()
 
-    # Save LoRA adapters
-    model.save_pretrained_merged(f"{OUTPUT_DIR}/final_model", tokenizer, save_method="lora")
-    print(f"\n✅ Model saved → {OUTPUT_DIR}/final_model")
+    model.save_pretrained_merged("aws-security-auditor-lora", tokenizer, save_method="lora")
+    print(f"\n✅ Model saved → aws-security-auditor-lora")
 
-    # Final comparison
     FastLanguageModel.for_inference(model)
     trained = evaluate(model, tokenizer, "FINAL EVALUATION (post-training)")
 
