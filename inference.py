@@ -75,17 +75,22 @@ def ask_llm(client, obs, feedback, step):
         return {"findings": data.get("findings", ["no findings"]), "severity": data.get("severity", []),
                 "recommendations": data.get("recommendations", []), "config_patch": data.get("config_patch", {})}
     except Exception as e:
+        # FIX 1: Log LLM errors instead of silently failing
+        print(f"[ERROR] ask_llm failed at step {step}: {e}", flush=True)
         return {"findings": ["llm call failed"], "severity": ["LOW"], "recommendations": ["retry"], "config_patch": {}}
 
 async def run_task(client, task_name):
     rewards, steps_taken, success = [], 0, False
     log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
     try:
+        # FIX 2: Log env_reset attempt so we can see if it fails
+        print(f"[DEBUG] Connecting to environment at {ENV_BASE_URL} ...", flush=True)
         result   = env_reset(task_name)
+        print(f"[DEBUG] env_reset response: {result}", flush=True)
         obs      = result.get("observation", {})
         feedback = obs.get("feedback")
         for step in range(1, MAX_STEPS + 1):
-            if result.get("done", False): break
+            # FIX 3: Moved done-check AFTER taking at least one step (was breaking before any steps)
             parsed   = ask_llm(client, obs, feedback, step)
             result   = env_step(parsed["findings"], parsed["severity"], parsed["recommendations"], parsed["config_patch"])
             obs      = result.get("observation", {})
@@ -98,7 +103,8 @@ async def run_task(client, task_name):
             if done: break
         success = (max(rewards) if rewards else 0.0) >= SUCCESS_THRESHOLD
     except Exception as e:
-        pass
+        # FIX 4: Log the actual exception instead of silently passing
+        print(f"[ERROR] run_task '{task_name}' crashed: {type(e).__name__}: {e}", flush=True)
     finally:
         final_score = max(rewards) if rewards else 0.0
         log_end(task=task_name, success=success, steps=steps_taken, score=final_score, rewards=rewards)
