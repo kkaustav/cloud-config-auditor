@@ -6,9 +6,13 @@ Stack: TRL + Unsloth + GRPO
 """
 
 import os, json, re, time, requests, torch
-from datasets import Dataset
+os.environ["UNSLOTH_RETURN_LOGITS"] = "1"
+os.environ["UNSLOTH_CACHE_DIR"] = "/tmp/unsloth_cache"
+import unsloth
+from unsloth import FastLanguageModel, PatchFastRL
+PatchFastRL("GRPO", FastLanguageModel)
 from trl import GRPOConfig, GRPOTrainer
-from unsloth import FastLanguageModel
+from datasets import Dataset
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
@@ -21,8 +25,8 @@ CURRICULUM   = [
     "easy_security_group",
     "medium_s3_policy",
     "hard_iam_vpc",
-    "medium_lambda_iam",       # NEW
-    "hard_rds_cloudtrail",     # NEW
+    "medium_lambda_iam",
+    "hard_rds_cloudtrail",
 ]
 
 # ── Environment Client ─────────────────────────────────────────────────────────
@@ -202,7 +206,6 @@ def main():
     print("Checking environment...")
     if not env_health():
         print(f"❌ Environment not reachable at {ENV_BASE_URL}")
-        print("   Run: uvicorn environment:app --host 0.0.0.0 --port 7860")
         return
     print(f"✅ Environment live at {ENV_BASE_URL}")
 
@@ -235,7 +238,7 @@ def main():
         gradient_accumulation_steps=4,
         learning_rate=5e-6,
         num_generations=4,
-        max_new_tokens=512,
+        max_completion_length=512,
         temperature=0.7,
         logging_steps=10,
         save_steps=50,
