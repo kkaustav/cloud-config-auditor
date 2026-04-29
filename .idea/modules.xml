@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/cloud-config-auditor.iml" filepath="$PROJECT_DIR$/.idea/cloud-config-auditor.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/aws-security-auditor.iml" filepath="$PROJECT_DIR$/.idea/aws-security-auditor.iml" />
     </modules>
   </component>
 </project>
