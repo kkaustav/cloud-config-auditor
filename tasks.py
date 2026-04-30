@@ -1,4 +1,3 @@
-# tasks.py — RESTORED v1 (original 3-task grading that gave 0.80/0.82/0.61)
 import json
 from typing import Dict, List, Tuple
 
