@@ -9,3 +9,4 @@
 [START] task=medium_s3_policy env=aws-security-auditor model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action=findings=6 reward=0.46 done=false error=null
 [STEP] step=2 action=findings=6 reward=0.65 done=false error=null
+[STEP] step=3 action=findings=6 reward=0.65 done=false error=null
