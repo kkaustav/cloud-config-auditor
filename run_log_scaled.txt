@@ -31,3 +31,8 @@ You have depleted your monthly included credits. Purchase pre-paid credits to co
 [STEP] step=5 action=findings=0 reward=0.01 done=false error="Client error '402 Payment Required' for url 'https://router.huggingface.co/v1/chat/completions' (Request ID: Root=1-69f3bcc5-5fa2714934b354ee0e05dfc7;16299be8-427f-4ab3-a120-13d532c81bbe)\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402\n\nYou have depleted your monthly included credits. Purchase pre-paid credits to continue using Inference Providers. Alternatively, subscribe to PRO to get 20x more included usage."
 [END] task=hard_iam_vpc success=true steps=5 score=0.680 rewards=0.68,0.01,0.01,0.01,0.01
 
+[START] task=medium_lambda_iam env=aws-security-auditor model=meta-llama/Llama-3.1-8B-Instruct
+[ERROR] ask_llm failed at step 1: Client error '402 Payment Required' for url 'https://router.huggingface.co/v1/chat/completions' (Request ID: Root=1-69f3bcc8-2114500c5cc6f4960768175f;9bde850d-6e59-4129-8c18-af2b861e7d2b)
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+
+You have depleted your monthly included credits. Purchase pre-paid credits to continue using Inference Providers. Alternatively, subscribe to PRO to get 20x more included usage.
