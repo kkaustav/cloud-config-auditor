@@ -17,3 +17,4 @@ You have depleted your monthly included credits. Purchase pre-paid credits to co
 [STEP] step=3 action=findings=11 reward=0.95 done=true error=null
 [END] task=medium_s3_policy success=true steps=3 score=0.950 rewards=0.01,0.01,0.95
 
+[START] task=hard_iam_vpc env=aws-security-auditor model=meta-llama/Llama-3.1-8B-Instruct
