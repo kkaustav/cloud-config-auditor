@@ -232,7 +232,7 @@ state = {
 
 def score_response(task_name, findings, severity, recommendations, config_patch):
     if task_name not in TASKS:
-        return 0.10
+        return 0.0
 
     expected = TASKS[task_name]["expected_findings"]
     agent_text = " ".join(str(x).lower() for x in (findings + recommendations))
@@ -242,21 +242,16 @@ def score_response(task_name, findings, severity, recommendations, config_patch)
         if any(kw.lower() in agent_text for kw in keyword_group):
             matched += 1
 
-    coverage = matched / len(expected)
+    raw_score = matched / len(expected)
 
     high_count = sum(1 for s in severity if str(s).upper() == "HIGH")
-    if high_count >= 2 and coverage > 0.5:
-        coverage = min(1.0, coverage + 0.05)
+    if high_count >= 2 and raw_score > 0.5:
+        raw_score = min(1.0, raw_score + 0.05)
 
     if isinstance(config_patch, dict) and len(config_patch) > 0:
-        coverage = min(1.0, coverage + 0.03)
+        raw_score = min(1.0, raw_score + 0.03)
 
-    if coverage <= 0:
-        score = 0.10
-    else:
-        score = 0.10 + coverage * (0.99 - 0.10)
-
-    return round(min(score, 0.99), 3)
+    return round(raw_score, 3)
 
 def build_feedback(task_name, findings, recommendations):
     expected = TASKS[task_name]["expected_findings"]
