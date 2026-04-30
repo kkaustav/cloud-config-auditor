@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
-"""
-AWS Security Auditor — OpenEnv HTTP/1.x compatible environment server
-Serves on localhost:7860 | Endpoints: /health /reset /step /state /schema /metadata /mcp
-"""
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
-import uvicorn, json, re, textwrap
+import uvicorn
+import json
 
 app = FastAPI(title="AWS Security Auditor OpenEnv", version="1.0.0")
 
 TASKS = {
-
     "easy_security_group": {
         "description": (
             "You are auditing an EC2 Security Group attached to a public-facing web server. "
@@ -23,11 +19,11 @@ TASKS = {
                 "GroupName": "web-server-sg",
                 "VpcId": "vpc-0123456789abcdef0",
                 "IpPermissions": [
-                    {"IpProtocol": "tcp", "FromPort": 22,   "ToPort": 22,   "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": ""}]},
+                    {"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": ""}]},
                     {"IpProtocol": "tcp", "FromPort": 3389, "ToPort": 3389, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": ""}]},
-                    {"IpProtocol": "tcp", "FromPort": 80,   "ToPort": 80,   "IpRanges": [{"CidrIp": "0.0.0.0/0"}]},
-                    {"IpProtocol": "tcp", "FromPort": 443,  "ToPort": 443,  "IpRanges": [{"CidrIp": "0.0.0.0/0"}]},
-                    {"IpProtocol": "-1",  "FromPort": -1,   "ToPort": -1,   "IpRanges": [{"CidrIp": "0.0.0.0/0"}]},
+                    {"IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "IpRanges": [{"CidrIp": "0.0.0.0/0"}]},
+                    {"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "IpRanges": [{"CidrIp": "0.0.0.0/0"}]},
+                    {"IpProtocol": "-1", "FromPort": -1, "ToPort": -1, "IpRanges": [{"CidrIp": "0.0.0.0/0"}]},
                 ],
                 "IpPermissionsEgress": [
                     {"IpProtocol": "-1", "FromPort": -1, "ToPort": -1, "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}
@@ -36,11 +32,11 @@ TASKS = {
             }
         }, indent=2),
         "expected_findings": [
-            ["port 22", "ssh", "22/tcp", "ssh port"],
-            ["port 3389", "rdp", "3389", "rdp port", "remote desktop"],
-            ["all traffic", "all protocol", "protocol -1", "all ports", "unrestricted inbound", "-1 inbound"],
-            ["unrestricted egress", "all egress", "egress unrestricted", "outbound unrestricted", "0.0.0.0/0 egress"],
-            ["no tag", "missing tag", "untagged", "no description", "empty description"],
+            ["port 22", "ssh", "22/tcp", "ssh access", "ssh open"],
+            ["port 3389", "rdp", "3389", "remote desktop"],
+            ["all traffic", "all protocol", "protocol -1", "all ports", "unrestricted inbound", "all inbound"],
+            ["unrestricted egress", "unrestricted outbound", "outbound unrestricted", "all outbound", "egress allows all", "0.0.0.0/0 egress", "outbound allow all"],
+            ["no tag", "missing tag", "untagged", "empty tag", "tags are empty", "no tags", "tag not configured"],
         ]
     },
 
@@ -75,13 +71,13 @@ TASKS = {
             "LifecycleConfiguration": {}
         }, indent=2),
         "expected_findings": [
-            ["public-read", "public acl", "acl public", "bucket acl"],
-            ["blockpublicacls", "block public", "public access block", "publicaccessblock disabled"],
-            ["encryption", "sse", "server-side encryption", "no encryption", "encryption disabled"],
-            ["versioning suspended", "versioning disabled", "no versioning", "versioning not enabled"],
-            ["logging", "access logging", "no logging", "server access log"],
-            ["principal *", "principal: *", "public write", "s3:putobject", "s3:deleteobject", "unauthenticated write"],
-            ["mfa delete", "mfa-delete", "mfa disabled", "no mfa"],
+            ["public-read", "public acl", "acl is public", "bucket acl", "publicly readable"],
+            ["blockpublicacls", "block public acl", "public access block", "public access is not blocked", "block public access"],
+            ["encryption", "sse", "server-side encryption", "no encryption", "not encrypted", "encryption not enabled"],
+            ["versioning suspended", "versioning is disabled", "no versioning", "versioning not enabled", "versioning is not"],
+            ["access logging", "logging is not", "no logging", "server access log", "logging not enabled", "logging disabled"],
+            ["principal", "s3:putobject", "s3:deleteobject", "allows public write", "unauthenticated", "public write access"],
+            ["mfa delete", "mfa-delete", "mfa is disabled", "no mfa", "mfa not enabled"],
         ]
     },
 
@@ -117,15 +113,15 @@ TASKS = {
             "CloudTrail": {"Enabled": False}
         }, indent=2),
         "expected_findings": [
-            ["action *", "wildcard action", "action: *", "all actions", "full admin", "administrator"],
-            ["resource *", "wildcard resource", "resource: *", "all resources"],
-            ["iam:passrole", "passrole", "privilege escalation", "iam passrole"],
-            ["iam:createaccesskey", "createaccesskey", "access key creation"],
-            ["no mfa", "mfa condition", "missing mfa", "no condition", "no mfa enforcement"],
-            ["flow log", "vpc flow", "no flow log", "flow logs disabled"],
-            ["default security group", "default sg", "sg-default"],
-            ["mappropubliciponlaunch", "auto-assign public ip", "public ip on launch", "public subnet"],
-            ["cloudtrail", "no cloudtrail", "cloudtrail disabled", "audit logging"],
+            ["action *", "wildcard", "all actions", "full admin", "administrator", "action: \"*\"", "allows all actions"],
+            ["resource *", "all resources", "resource: \"*\"", "any resource"],
+            ["passrole", "iam:passrole", "privilege escalation", "pass role"],
+            ["createaccesskey", "iam:createaccesskey", "create access key", "access key creation"],
+            ["no mfa", "mfa not enforced", "missing mfa", "mfa condition", "without mfa", "mfa is not required"],
+            ["flow log", "vpc flow", "no flow log", "flow logs not", "flow logs are not", "flow logs disabled"],
+            ["default security group", "default sg", "default security group allows"],
+            ["public ip", "auto-assign", "map public", "automatically assign", "public subnet", "assigns public"],
+            ["cloudtrail", "no cloudtrail", "cloudtrail is not", "cloudtrail disabled", "cloudtrail not enabled"],
         ]
     },
 
@@ -158,7 +154,8 @@ TASKS = {
                 "RoleName": "lambda-execution-role",
                 "AttachedPolicies": [
                     {"PolicyArn": "arn:aws:iam::aws:policy/AdministratorAccess"}
-                ]
+                ],
+                "InlinePolicies": []
             }
         }, indent=2),
         "expected_findings": [
@@ -192,6 +189,7 @@ TASKS = {
                 "IAMDatabaseAuthenticationEnabled": False,
                 "EnabledCloudwatchLogsExports": [],
                 "VpcSecurityGroups": [{"VpcSecurityGroupId": "sg-rds-open", "Status": "active"}],
+                "StorageType": "gp2",
                 "EnhancedMonitoringEnabled": False
             },
             "CloudTrail": {
@@ -207,7 +205,7 @@ TASKS = {
             }
         }, indent=2),
         "expected_findings": [
-            ["publicly accessible", "public", "rds public", "publicly accessible: true"],
+            ["publicly accessible", "rds public", "public database", "public exposure"],
             ["storage encrypted", "not encrypted", "encryption disabled", "storageencrypted false"],
             ["backup", "backupretentionperiod 0", "no backup", "retention period 0"],
             ["multiaz", "multi-az", "no multi-az", "single az", "no high availability"],
@@ -224,51 +222,120 @@ TASKS = {
     }
 }
 
-state = {"task": None, "step": 0, "last_reward": 0.0, "last_feedback": None, "done": False}
+state = {
+    "task": None,
+    "step": 0,
+    "last_reward": 0.0,
+    "last_feedback": None,
+    "done": False,
+}
 
 def score_response(task_name, findings, severity, recommendations, config_patch):
     if task_name not in TASKS:
         return 0.0
+
     expected = TASKS[task_name]["expected_findings"]
-    agent_text = " ".join(f.lower() for f in findings + recommendations)
-    matched = sum(1 for kw_group in expected if any(kw.lower() in agent_text for kw in kw_group))
+    agent_text = " ".join(str(x).lower() for x in (findings + recommendations))
+
+    matched = 0
+    for keyword_group in expected:
+        if any(kw.lower() in agent_text for kw in keyword_group):
+            matched += 1
+
     raw_score = matched / len(expected)
-    if sum(1 for s in severity if s.upper() == "HIGH") >= 2 and raw_score > 0.5:
+
+    high_count = sum(1 for s in severity if str(s).upper() == "HIGH")
+    if high_count >= 2 and raw_score > 0.5:
         raw_score = min(1.0, raw_score + 0.05)
-    if config_patch and len(config_patch) > 0:
+
+    if isinstance(config_patch, dict) and len(config_patch) > 0:
         raw_score = min(1.0, raw_score + 0.03)
+
     return round(raw_score, 3)
 
-def build_feedback(task_name, findings, reward):
+def build_feedback(task_name, findings, recommendations):
     expected = TASKS[task_name]["expected_findings"]
-    agent_text = " ".join(f.lower() for f in findings)
-    missed = [g[0] for g in expected if not any(kw.lower() in agent_text for kw in g)]
+    agent_text = " ".join(str(x).lower() for x in (findings + recommendations))
+    missed = []
+
+    for keyword_group in expected:
+        if not any(kw.lower() in agent_text for kw in keyword_group):
+            missed.append(keyword_group[0])
+
     if not missed:
         return "All key findings identified. Excellent audit."
-    return f"Missed findings related to: {', '.join(missed[:4])}. Re-examine the full configuration carefully."
+
+    return (
+        "Missed findings related to: "
+        + ", ".join(missed[:4])
+        + ". Re-examine the full configuration carefully and use more explicit AWS wording."
+    )
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "environment": "aws-security-auditor", "version": "1.0.0"}
+    return {
+        "status": "ok",
+        "environment": "aws-security-auditor",
+        "version": "1.0.0",
+    }
 
 @app.post("/reset")
 async def reset(task: str = Query(...)):
     if task not in TASKS:
-        return JSONResponse(status_code=400, content={"error": f"Unknown task '{task}'. Valid: {list(TASKS.keys())}"})
-    state.update({"task": task, "step": 0, "last_reward": 0.0, "last_feedback": None, "done": False})
-    return {"observation": {"task_description": TASKS[task]["description"], "config": TASKS[task]["config"], "feedback": None, "last_reward": 0.0, "step": 0}}
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Unknown task: {task}. Valid tasks: {list(TASKS.keys())}"},
+        )
+
+    state["task"] = task
+    state["step"] = 0
+    state["last_reward"] = 0.0
+    state["last_feedback"] = None
+    state["done"] = False
+
+    return {
+        "observation": {
+            "task_description": TASKS[task]["description"],
+            "config": TASKS[task]["config"],
+            "feedback": None,
+            "last_reward": 0.0,
+            "step": 0,
+        }
+    }
 
 @app.post("/step")
 async def step(request: Request):
     body = await request.json()
+
+    findings = body.get("findings", [])
+    severity = body.get("severity", [])
+    recommendations = body.get("recommendations", [])
+    config_patch = body.get("config_patch", {})
+
     task_name = state.get("task")
     if not task_name:
         return JSONResponse(status_code=400, content={"error": "Call /reset first."})
+
     state["step"] += 1
-    reward = score_response(task_name, body.get("findings", []), body.get("severity", []), body.get("recommendations", []), body.get("config_patch", {}))
-    feedback = build_feedback(task_name, body.get("findings", []), reward)
-    state.update({"last_reward": reward, "last_feedback": feedback, "done": reward >= 0.9 or state["step"] >= 5})
-    return {"reward": reward, "done": state["done"], "observation": {"task_description": TASKS[task_name]["description"], "config": TASKS[task_name]["config"], "feedback": feedback, "last_reward": reward, "step": state["step"]}}
+    reward = score_response(task_name, findings, severity, recommendations, config_patch)
+    feedback = build_feedback(task_name, findings, recommendations)
+
+    state["last_reward"] = reward
+    state["last_feedback"] = feedback
+    done = reward >= 0.9 or state["step"] >= 5
+    state["done"] = done
+
+    return {
+        "reward": reward,
+        "done": done,
+        "observation": {
+            "task_description": TASKS[task_name]["description"],
+            "config": TASKS[task_name]["config"],
+            "feedback": feedback,
+            "last_reward": reward,
+            "step": state["step"],
+        },
+    }
 
 @app.get("/state")
 def get_state():
@@ -276,15 +343,43 @@ def get_state():
 
 @app.get("/schema")
 def schema():
-    return {"reset": {"input": {"task": "string"}}, "step": {"input": {"findings": "list[str]", "severity": "list[str]", "recommendations": "list[str]", "config_patch": "object"}}}
+    return {
+        "reset": {
+            "input": {"task": "string"},
+            "output": {"observation": "object"},
+        },
+        "step": {
+            "input": {
+                "findings": "list[str]",
+                "severity": "list[str]",
+                "recommendations": "list[str]",
+                "config_patch": "object",
+            },
+            "output": {
+                "reward": "float",
+                "done": "bool",
+                "observation": "object",
+            },
+        },
+    }
 
 @app.get("/metadata")
 def metadata():
-    return {"name": "aws-security-auditor", "version": "1.0.0", "tasks": list(TASKS.keys()), "profile": "openenv-http/1.x"}
+    return {
+        "name": "aws-security-auditor",
+        "version": "1.0.0",
+        "tasks": list(TASKS.keys()),
+        "profile": "openenv-http/1.x",
+        "success_threshold": 0.55,
+        "max_steps": 5,
+    }
 
 @app.get("/mcp")
 def mcp():
-    return {"protocol": "openenv-http/1.x", "endpoints": ["/reset", "/step", "/state", "/health", "/schema", "/metadata"]}
+    return {
+        "protocol": "openenv-http/1.x",
+        "endpoints": ["/reset", "/step", "/state", "/health", "/schema", "/metadata"],
+    }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=7860)
