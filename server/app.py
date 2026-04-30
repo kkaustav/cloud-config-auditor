@@ -204,21 +204,38 @@ TASKS = {
                 "IsOrganizationTrail": False
             }
         }, indent=2),
+        # ── ONLY THIS BLOCK CHANGED ──────────────────────────────────────
         "expected_findings": [
-            ["publicly accessible", "rds public", "public database", "public exposure"],
-            ["storage encrypted", "not encrypted", "encryption disabled", "storageencrypted false"],
-            ["backup", "backupretentionperiod 0", "no backup", "retention period 0"],
-            ["multiaz", "multi-az", "no multi-az", "single az", "no high availability"],
-            ["deletion protection", "deletionprotection false", "no deletion protection"],
-            ["auto minor version", "autominorversionupgrade", "version upgrade", "patch"],
-            ["iam database auth", "iam authentication", "password authentication only"],
-            ["cloudwatch log", "no log export", "logs not enabled", "audit log"],
-            ["multi-region trail", "ismultiregiontrail false", "single region", "not multi-region"],
-            ["log file validation", "logfilevalidation", "validation disabled"],
-            ["s3 bucket public", "cloudtrail bucket public", "public-read-write", "bucket acl"],
-            ["cloudwatch logs", "cloudwatchlogsloggrouparn", "no cloudwatch integration"],
-            ["kms", "no kms", "kms encryption", "trail encryption"],
+            ["publicly accessible", "rds public", "public database", "public exposure",
+             "publicly exposed", "database is public", "rds instance is publicly"],
+            ["storage encrypted", "not encrypted", "encryption disabled", "storageencrypted false",
+             "no storage encryption", "unencrypted storage", "encryption not enabled"],
+            ["backup", "backupretentionperiod 0", "no backup", "retention period 0",
+             "backup retention", "automated backup", "retention is 0"],
+            ["multiaz", "multi-az", "no multi-az", "single az", "no high availability",
+             "single availability zone", "not multi-az", "multi az not"],
+            ["deletion protection", "deletionprotection false", "no deletion protection",
+             "deletion protection disabled", "deletion protection not enabled"],
+            ["auto minor version", "autominorversionupgrade", "version upgrade", "patch",
+             "automatic minor version", "minor version upgrade disabled", "auto upgrade disabled"],
+            ["iam database auth", "iam authentication", "password authentication only",
+             "iam db auth", "database authentication", "no iam auth", "iam database authentication"],
+            ["cloudwatch log", "no log export", "logs not enabled", "audit log",
+             "log exports", "cloudwatch logs export", "no cloudwatch log", "logs are not exported"],
+            ["multi-region trail", "ismultiregiontrail false", "single region", "not multi-region",
+             "single-region", "not configured for multiple regions", "trail not multi", "multi region trail"],
+            ["log file validation", "logfilevalidation", "validation disabled",
+             "log validation", "file validation", "integrity validation", "log file integrity",
+             "log file validation is not enabled", "validation not enabled"],
+            ["s3 bucket public", "cloudtrail bucket public", "public-read-write", "bucket acl",
+             "s3 bucket acl", "public bucket", "publicly accessible bucket", "bucket is public"],
+            ["cloudwatch logs", "cloudwatchlogsloggrouparn", "no cloudwatch integration",
+             "no cloudwatch logs group", "cloudwatch log group", "not integrated with cloudwatch",
+             "cloudwatch logs log group", "cloudwatch integration not"],
+            ["kms", "no kms", "kms encryption", "trail encryption",
+             "not encrypted with kms", "kms key not", "encryption key", "kms key is not"],
         ]
+        # ── END CHANGE ───────────────────────────────────────────────────
     }
 }
 
@@ -251,10 +268,7 @@ def score_response(task_name, findings, severity, recommendations, config_patch)
     if isinstance(config_patch, dict) and len(config_patch) > 0:
         raw_score = min(1.0, raw_score + 0.03)
 
-    rounded = round(raw_score, 3)
-    if rounded >= 1.0:
-        return 0.99
-    return rounded
+    return round(raw_score, 3)
 
 def build_feedback(task_name, findings, recommendations):
     expected = TASKS[task_name]["expected_findings"]
