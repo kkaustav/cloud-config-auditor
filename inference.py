@@ -1,29 +1,39 @@
-import asyncio, json, os, re, textwrap, urllib.request
-from typing import List, Optional
+import asyncio
+import json
+import os
+import re
+import textwrap
+import urllib.request
 from openai import OpenAI
 
-API_KEY           = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "")
-API_BASE_URL      = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME        = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-ENV_BASE_URL      = os.getenv("ENV_BASE_URL", "http://localhost:7860").rstrip("/")
-BENCHMARK         = "aws-security-auditor"
-MAX_STEPS         = 5
-TEMPERATURE       = 0.2
-MAX_TOKENS        = 2000
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860").rstrip("/")
+
+BENCHMARK = "aws-security-auditor"
+MAX_STEPS = 5
+TEMPERATURE = 0.2
+MAX_TOKENS = 2000
 SUCCESS_THRESHOLD = 0.55
-TASKS_TO_RUN      = [
+
+TASKS_TO_RUN = [
     "easy_security_group",
     "medium_s3_policy",
     "hard_iam_vpc",
-    "medium_lambda_iam",    # NEW
-    "hard_rds_cloudtrail",  # NEW
+    "medium_lambda_iam",
+    "hard_rds_cloudtrail",
 ]
 
 def log_start(task, env, model):
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
 def log_step(step, action, reward, done, error=None):
-    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={error or 'null'}", flush=True)
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} "
+        f"done={str(done).lower()} error={error or 'null'}",
+        flush=True,
+    )
 
 def log_end(task, success, steps, score, rewards):
     r_str = ",".join(f"{r:.2f}" for r in rewards)
@@ -34,17 +44,29 @@ def log_end(task, success, steps, score, rewards):
     )
 
 def _post(path, body):
-    url  = f"{ENV_BASE_URL}{path}"
+    url = f"{ENV_BASE_URL}{path}"
     data = json.dumps(body).encode("utf-8")
-    req  = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json", "Accept": "application/json"})
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 def env_reset(task_name):
     return _post(f"/reset?task={task_name}", {})
 
-def env_step(findings, severity, recommendations, config_patch={}):
-    return _post("/step", {"findings": findings, "severity": severity, "recommendations": recommendations, "config_patch": config_patch})
+def env_step(findings, severity, recommendations, config_patch=None):
+    return _post(
+        "/step",
+        {
+            "findings": findings,
+            "severity": severity,
+            "recommendations": recommendations,
+            "config_patch": config_patch or {},
+        },
+    )
 
 SYSTEM_PROMPT = textwrap.dedent("""
 You are a senior AWS cloud security engineer performing a security audit.
@@ -56,57 +78,150 @@ Respond ONLY with valid JSON (no markdown, no code blocks):
 RULES:
 - findings and recommendations MUST be the same length
 - severity values: HIGH, MEDIUM, or LOW only — one per finding
-- Identify at least 5-6 distinct security issues
+- Identify at least 6-10 distinct security issues where possible
 - Be thorough and cover all AWS services present in the config
 - Use precise AWS technical terminology in your findings
+- Mention exact risky settings from the config when relevant
 - config_patch should contain relevant remediation key-value pairs for the issues found
 """).strip()
 
+def normalize_output(data):
+    findings = data.get("findings", [])
+    severity = data.get("severity", [])
+    recommendations = data.get("recommendations", [])
+    config_patch = data.get("config_patch", {})
+
+    if not isinstance(findings, list):
+        findings = [str(findings)]
+    if not isinstance(severity, list):
+        severity = [str(severity)]
+    if not isinstance(recommendations, list):
+        recommendations = [str(recommendations)]
+    if not isinstance(config_patch, dict):
+        config_patch = {}
+
+    findings = [str(x).strip() for x in findings if str(x).strip()]
+    severity = [str(x).strip().upper() for x in severity if str(x).strip()]
+    recommendations = [str(x).strip() for x in recommendations if str(x).strip()]
+
+    if not findings:
+        findings = ["No findings provided"]
+    if not recommendations:
+        recommendations = ["Re-review the AWS configuration for security issues"]
+
+    allowed = {"HIGH", "MEDIUM", "LOW"}
+    severity = [s if s in allowed else "MEDIUM" for s in severity]
+
+    if len(severity) < len(findings):
+        severity.extend(["MEDIUM"] * (len(findings) - len(severity)))
+    severity = severity[:len(findings)]
+
+    if len(recommendations) < len(findings):
+        recommendations.extend(
+            ["Apply least privilege, restrict public exposure, and enable logging/encryption"]
+            * (len(findings) - len(recommendations))
+        )
+    recommendations = recommendations[:len(findings)]
+
+    return {
+        "findings": findings,
+        "severity": severity,
+        "recommendations": recommendations,
+        "config_patch": config_patch,
+    }
+
 def ask_llm(client, obs, feedback, step):
-    config    = obs.get("config", "")
+    config = obs.get("config", "")
     task_desc = obs.get("task_description", "")
-    prev_rew  = obs.get("last_reward", 0.0)
-    user_msg  = f"Task: {task_desc}\n\nConfiguration:\n{config}"
+    prev_rew = obs.get("last_reward", 0.0)
+
+    user_msg = f"Task: {task_desc}\n\nConfiguration:\n{config}"
+
     if feedback and step > 1:
-        user_msg += f"\n\nPrevious score: {prev_rew:.2f}/1.0 — some issues were missed.\nRe-analyse the full configuration carefully and identify any remaining security misconfigurations you may have overlooked."
+        user_msg += (
+            f"\n\nPrevious score: {prev_rew:.2f}/1.0."
+            f"\nFeedback: {feedback}"
+            "\nRe-analyse the full configuration carefully."
+            "\nDo not repeat the same answer."
+            "\nAdd any missed security findings using alternative precise AWS wording."
+            "\nReturn a more complete finding list than before."
+        )
+
+    dynamic_temp = TEMPERATURE if step == 1 else 0.6
+
     try:
-        dynamic_temp = TEMPERATURE if step == 1 else 0.6
         response = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_msg}],
-            temperature=dynamic_temp, max_tokens=MAX_TOKENS,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=dynamic_temp,
+            max_tokens=MAX_TOKENS,
             timeout=60,
         )
-        raw  = (response.choices[0].message.content or "{}").strip()
-        raw  = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.MULTILINE)
+
+        raw = (response.choices[0].message.content or "{}").strip()
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.MULTILINE)
         data = json.loads(raw)
-        return {"findings": data.get("findings", ["no findings"]), "severity": data.get("severity", []),
-                "recommendations": data.get("recommendations", []), "config_patch": data.get("config_patch", {})}
+        return normalize_output(data)
+
     except Exception as e:
         print(f"[ERROR] ask_llm failed at step {step}: {e}", flush=True)
-        return {"findings": ["llm call failed"], "severity": ["LOW"], "recommendations": ["retry"], "config_patch": {}}
+        return {
+            "findings": ["LLM call failed"],
+            "severity": ["LOW"],
+            "recommendations": ["Retry the analysis"],
+            "config_patch": {},
+        }
 
 async def run_task(client, task_name):
-    rewards, steps_taken, success = [], 0, False
+    rewards = []
+    steps_taken = 0
+    success = False
+
     log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
+
     try:
-        result   = env_reset(task_name)
-        obs      = result.get("observation", {})
+        result = env_reset(task_name)
+        obs = result.get("observation", {})
         feedback = obs.get("feedback")
+
         for step in range(1, MAX_STEPS + 1):
-            parsed   = ask_llm(client, obs, feedback, step)
-            result   = env_step(parsed["findings"], parsed["severity"], parsed["recommendations"], parsed["config_patch"])
-            obs      = result.get("observation", {})
-            reward   = float(result.get("reward", 0.0))
-            done     = result.get("done", False)
+            parsed = ask_llm(client, obs, feedback, step)
+            result = env_step(
+                parsed["findings"],
+                parsed["severity"],
+                parsed["recommendations"],
+                parsed["config_patch"],
+            )
+
+            obs = result.get("observation", {})
+            reward = float(result.get("reward", 0.0))
+            done = result.get("done", False)
             feedback = obs.get("feedback")
+
             rewards.append(reward)
             steps_taken = step
-            log_step(step=step, action=f"findings={len(parsed['findings'])}", reward=reward, done=done)
-            if done: break
+
+            log_step(
+                step=step,
+                action=f"findings={len(parsed['findings'])}",
+                reward=reward,
+                done=done,
+            )
+
+            if done:
+                break
+
+            if len(rewards) >= 2 and rewards[-1] == rewards[-2]:
+                break
+
         success = (max(rewards) if rewards else 0.0) >= SUCCESS_THRESHOLD
+
     except Exception as e:
         print(f"[ERROR] run_task '{task_name}' crashed: {type(e).__name__}: {e}", flush=True)
+
     finally:
         final_score = max(rewards) if rewards else 0.0
         log_end(task=task_name, success=success, steps=steps_taken, score=final_score, rewards=rewards)
