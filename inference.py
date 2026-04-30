@@ -70,10 +70,11 @@ def ask_llm(client, obs, feedback, step):
     if feedback and step > 1:
         user_msg += f"\n\nPrevious score: {prev_rew:.2f}/1.0 — some issues were missed.\nRe-analyse the full configuration carefully and identify any remaining security misconfigurations you may have overlooked."
     try:
+        dynamic_temp = TEMPERATURE if step == 1 else 0.6
         response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_msg}],
-            temperature=TEMPERATURE, max_tokens=MAX_TOKENS,
+            temperature=dynamic_temp, max_tokens=MAX_TOKENS,
             timeout=60,
         )
         raw  = (response.choices[0].message.content or "{}").strip()
