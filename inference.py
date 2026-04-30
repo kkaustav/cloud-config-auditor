@@ -1,23 +1,25 @@
-import asyncio
-import json
+#!/usr/bin/env python3
+
 import os
+import json
 import re
-import textwrap
-import urllib.request
-from openai import OpenAI
+import sys
+import requests
+from huggingface_hub import InferenceClient
 
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860").rstrip("/")
+# ── CONFIG ────────────────────────────────────────────────────────────────────
+HF_TOKEN   = os.environ.get("HF_TOKEN", "")
+BASE_URL   = "https://kkaustav-cloud-config-auditor.hf.space"
+MAX_STEPS  = 5
 
-BENCHMARK = "aws-security-auditor"
-MAX_STEPS = 5
-TEMPERATURE = 0.2
-MAX_TOKENS = 2000
-SUCCESS_THRESHOLD = 0.55
+# Free-tier models in priority order — switches to next on 402
+MODELS = [
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "google/gemma-2-9b-it",
+    "mistralai/Mistral-7B-Instruct-v0.3",
+]
 
-TASKS_TO_RUN = [
+TASKS = [
     "easy_security_group",
     "medium_s3_policy",
     "hard_iam_vpc",
@@ -25,212 +27,199 @@ TASKS_TO_RUN = [
     "hard_rds_cloudtrail",
 ]
 
-def log_start(task, env, model):
-    print(f"[START] task={task} env={env} model={model}", flush=True)
+SYSTEM_PROMPT = (
+    "You are an expert AWS cloud security auditor. "
+    "Analyse the provided AWS configuration and return a security audit as valid JSON ONLY. "
+    "Do not include any explanation, markdown, or text outside the JSON object. "
+    "Return exactly this structure:\n"
+    '{"findings":["<finding1>","<finding2>"],"severity":["CRITICAL","HIGH","MEDIUM","LOW"],"recommendations":["<rec1>"],"config_patch":{"key":"value"}}'
+)
+# ── END CONFIG ────────────────────────────────────────────────────────────────
 
-def log_step(step, action, reward, done, error=None):
-    print(
-        f"[STEP] step={step} action={action} reward={reward:.2f} "
-        f"done={str(done).lower()} error={error or 'null'}",
-        flush=True,
-    )
 
-def log_end(task, success, steps, score, rewards):
-    r_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(
-        f"[END] task={task} success={str(success).lower()} steps={steps} "
-        f"score={score:.3f} rewards={r_str}",
-        flush=True,
-    )
-
-def _post(path, body):
-    url = f"{ENV_BASE_URL}{path}"
-    data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-def env_reset(task_name):
-    return _post(f"/reset?task={task_name}", {})
-
-def env_step(findings, severity, recommendations, config_patch=None):
-    return _post(
-        "/step",
-        {
-            "findings": findings,
-            "severity": severity,
-            "recommendations": recommendations,
-            "config_patch": config_patch or {},
-        },
-    )
-
-SYSTEM_PROMPT = textwrap.dedent("""
-You are a senior AWS cloud security engineer performing a security audit.
-Analyse the provided AWS configuration and identify ALL security misconfigurations.
-
-Respond ONLY with valid JSON (no markdown, no code blocks):
-{"findings": ["finding1", "finding2"], "severity": ["HIGH", "MEDIUM"], "recommendations": ["fix1", "fix2"], "config_patch": {}}
-
-RULES:
-- findings and recommendations MUST be the same length
-- severity values: HIGH, MEDIUM, or LOW only — one per finding
-- Identify at least 6-10 distinct security issues where possible
-- Be thorough and cover all AWS services present in the config
-- Use precise AWS technical terminology in your findings
-- Mention exact risky settings from the config when relevant
-- config_patch should contain relevant remediation key-value pairs for the issues found
-""").strip()
-
-def normalize_output(data):
-    findings = data.get("findings", [])
-    severity = data.get("severity", [])
-    recommendations = data.get("recommendations", [])
-    config_patch = data.get("config_patch", {})
-
-    if not isinstance(findings, list):
-        findings = [str(findings)]
-    if not isinstance(severity, list):
-        severity = [str(severity)]
-    if not isinstance(recommendations, list):
-        recommendations = [str(recommendations)]
-    if not isinstance(config_patch, dict):
-        config_patch = {}
-
-    findings = [str(x).strip() for x in findings if str(x).strip()]
-    severity = [str(x).strip().upper() for x in severity if str(x).strip()]
-    recommendations = [str(x).strip() for x in recommendations if str(x).strip()]
-
-    if not findings:
-        findings = ["No findings provided"]
-    if not recommendations:
-        recommendations = ["Re-review the AWS configuration for security issues"]
-
-    allowed = {"HIGH", "MEDIUM", "LOW"}
-    severity = [s if s in allowed else "MEDIUM" for s in severity]
-
-    if len(severity) < len(findings):
-        severity.extend(["MEDIUM"] * (len(findings) - len(severity)))
-    severity = severity[:len(findings)]
-
-    if len(recommendations) < len(findings):
-        recommendations.extend(
-            ["Apply least privilege, restrict public exposure, and enable logging/encryption"]
-            * (len(findings) - len(recommendations))
-        )
-    recommendations = recommendations[:len(findings)]
-
-    return {
-        "findings": findings,
-        "severity": severity,
-        "recommendations": recommendations,
-        "config_patch": config_patch,
-    }
-
-def ask_llm(client, obs, feedback, step):
-    config = obs.get("config", "")
+def build_user_prompt(obs):
     task_desc = obs.get("task_description", "")
-    prev_rew = obs.get("last_reward", 0.0)
+    config    = obs.get("config", "")
+    feedback  = obs.get("feedback")
+    reward    = obs.get("last_reward", 0.0)
 
-    user_msg = f"Task: {task_desc}\n\nConfiguration:\n{config}"
+    prompt = f"{task_desc}\n\nAWS Configuration:\n{config}"
+    if feedback:
+        prompt += f"\n\nPrevious attempt scored {reward:.2f}. Evaluator feedback: {feedback}"
+        prompt += "\nFix ALL missed findings. Use explicit AWS service names and field names."
+    return prompt
 
-    if feedback and step > 1:
-        user_msg += (
-            f"\n\nPrevious score: {prev_rew:.2f}/1.0."
-            f"\nFeedback: {feedback}"
-            "\nRe-analyse the full configuration carefully."
-            "\nDo not repeat the same answer."
-            "\nAdd any missed security findings using alternative precise AWS wording."
-            "\nReturn a more complete finding list than before."
+
+def parse_json(text):
+    text = text.strip()
+    # strip markdown code fences if present
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    # try direct parse first
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    # extract first { ... } block
+    m = re.search(r"\{.*\}", text, re.DOTALL)
+    if not m:
+        raise ValueError("No JSON object found")
+    raw = m.group().strip()
+    # try progressively shorter line-wise prefixes to handle trailing garbage
+    lines = raw.split("\n")
+    for i in range(len(lines), 0, -1):
+        try:
+            return json.loads("\n".join(lines[:i]))
+        except Exception:
+            continue
+    raise ValueError("Could not parse JSON")
+
+
+def ask_llm(client, model, messages):
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        max_tokens=1024,
+        temperature=0.1,
+    )
+    return response.choices[0].message.content
+
+
+def get_client_and_model(hf_token):
+    """Return (InferenceClient, model_name) using the first model that responds."""
+    for model in MODELS:
+        try:
+            client = InferenceClient(token=hf_token)
+            # quick probe — 1 token just to test the model is available
+            client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=1,
+            )
+            print(f"[MODEL] Using {model}", flush=True)
+            return client, model
+        except Exception as e:
+            err = str(e)
+            if "402" in err or "429" in err or "503" in err or "loading" in err.lower():
+                print(f"[MODEL] {model} unavailable ({err[:80]}), trying next…", flush=True)
+                continue
+            # unexpected error — still try next
+            print(f"[MODEL] {model} error: {err[:120]}, trying next…", flush=True)
+            continue
+    raise RuntimeError("All models exhausted. Top up HuggingFace credits or add more fallback models.")
+
+
+def run_task(task, client, model):
+    # ── reset ──────────────────────────────────────────────────────────────
+    r = requests.post(f"{BASE_URL}/reset", params={"task": task}, timeout=30)
+    r.raise_for_status()
+    obs = r.json()["observation"]
+
+    print(f"[START] task={task} env=aws-security-auditor model={model}", flush=True)
+
+    best_score  = 0.0
+    all_rewards = []
+    messages    = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    for step in range(1, MAX_STEPS + 1):
+        user_msg = build_user_prompt(obs)
+        messages.append({"role": "user", "content": user_msg})
+
+        # ── call LLM ───────────────────────────────────────────────────────
+        raw_text   = None
+        parsed     = None
+        llm_error  = None
+
+        try:
+            raw_text = ask_llm(client, model, messages)
+            parsed   = parse_json(raw_text)
+        except Exception as e:
+            llm_error = str(e)
+            if "402" in llm_error:
+                # credits exhausted mid-run — hard stop
+                print(
+                    f"[ERROR] ask_llm failed at step {step}: {llm_error}",
+                    flush=True,
+                )
+                # send empty step so env records it
+                parsed = {"findings": [], "severity": [], "recommendations": [], "config_patch": {}}
+            else:
+                print(f"[ERROR] ask_llm failed at step {step}: {llm_error}", flush=True)
+                parsed = {"findings": [], "severity": [], "recommendations": [], "config_patch": {}}
+
+        findings        = parsed.get("findings", [])
+        severity        = parsed.get("severity", [])
+        recommendations = parsed.get("recommendations", [])
+        config_patch    = parsed.get("config_patch", {})
+
+        # ── step ───────────────────────────────────────────────────────────
+        step_r = requests.post(
+            f"{BASE_URL}/step",
+            json={
+                "findings":        findings,
+                "severity":        severity,
+                "recommendations": recommendations,
+                "config_patch":    config_patch,
+            },
+            timeout=30,
+        )
+        step_r.raise_for_status()
+        step_data = step_r.json()
+
+        reward = step_data.get("reward", 0.0) or 0.0
+        done   = step_data.get("done", False)
+        obs    = step_data.get("observation", obs)
+
+        all_rewards.append(reward)
+        if reward > best_score:
+            best_score = reward
+
+        n_findings = len(findings)
+        print(
+            f"[STEP] step={step} action=findings={n_findings} "
+            f"reward={reward:.2f} done={str(done).lower()} "
+            f"error={json.dumps(llm_error)}",
+            flush=True,
         )
 
-    dynamic_temp = TEMPERATURE if step == 1 else 0.6
+        # add assistant response to history so the model can iterate
+        if raw_text:
+            messages.append({"role": "assistant", "content": raw_text})
 
-    try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg},
-            ],
-            temperature=dynamic_temp,
-            max_tokens=MAX_TOKENS,
-            timeout=60,
-        )
+        if done:
+            break
 
-        raw = (response.choices[0].message.content or "{}").strip()
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.MULTILINE)
-        data = json.loads(raw)
-        return normalize_output(data)
+    rewards_str = ",".join(f"{x:.2f}" for x in all_rewards)
+    success = best_score >= 0.55
+    print(
+        f"[END] task={task} success={str(success).lower()} "
+        f"steps={len(all_rewards)} score={best_score:.3f} rewards={rewards_str}",
+        flush=True,
+    )
+    print("", flush=True)
+    return best_score
 
-    except Exception as e:
-        print(f"[ERROR] ask_llm failed at step {step}: {e}", flush=True)
-        return {
-            "findings": ["LLM call failed"],
-            "severity": ["LOW"],
-            "recommendations": ["Retry the analysis"],
-            "config_patch": {},
-        }
 
-async def run_task(client, task_name):
-    rewards = []
-    steps_taken = 0
-    success = False
+def main():
+    if not HF_TOKEN:
+        print("[FATAL] HF_TOKEN not set. Run: export HF_TOKEN=hf_...", flush=True)
+        sys.exit(1)
 
-    log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
+    client, model = get_client_and_model(HF_TOKEN)
 
-    try:
-        result = env_reset(task_name)
-        obs = result.get("observation", {})
-        feedback = obs.get("feedback")
+    scores = []
+    for task in TASKS:
+        try:
+            score = run_task(task, client, model)
+            scores.append(score)
+        except Exception as e:
+            print(f"[FATAL] task={task} crashed: {e}", flush=True)
+            scores.append(0.0)
 
-        for step in range(1, MAX_STEPS + 1):
-            parsed = ask_llm(client, obs, feedback, step)
-            result = env_step(
-                parsed["findings"],
-                parsed["severity"],
-                parsed["recommendations"],
-                parsed["config_patch"],
-            )
+    print("Task scores:", scores)
+    if scores:
+        print(f"OVERALL: {sum(scores)/len(scores):.3f}")
 
-            obs = result.get("observation", {})
-            reward = float(result.get("reward", 0.0))
-            done = result.get("done", False)
-            feedback = obs.get("feedback")
-
-            rewards.append(reward)
-            steps_taken = step
-
-            log_step(
-                step=step,
-                action=f"findings={len(parsed['findings'])}",
-                reward=reward,
-                done=done,
-            )
-
-            if done:
-                break
-
-            if len(rewards) >= 2 and rewards[-1] == rewards[-2]:
-                break
-
-        success = (max(rewards) if rewards else 0.0) >= SUCCESS_THRESHOLD
-
-    except Exception as e:
-        print(f"[ERROR] run_task '{task_name}' crashed: {type(e).__name__}: {e}", flush=True)
-
-    finally:
-        final_score = max(rewards) if rewards else 0.0
-        log_end(task=task_name, success=success, steps=steps_taken, score=final_score, rewards=rewards)
-
-async def main():
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-    for task_name in TASKS_TO_RUN:
-        await run_task(client, task_name)
-        print("", flush=True)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
