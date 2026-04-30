@@ -251,7 +251,10 @@ def score_response(task_name, findings, severity, recommendations, config_patch)
     if isinstance(config_patch, dict) and len(config_patch) > 0:
         raw_score = min(1.0, raw_score + 0.03)
 
-    return round(min(raw_score, 0.99), 3)
+    rounded = round(raw_score, 3)
+    if rounded >= 1.0:
+        return 0.99
+    return rounded
 
 def build_feedback(task_name, findings, recommendations):
     expected = TASKS[task_name]["expected_findings"]
