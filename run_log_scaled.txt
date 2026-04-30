@@ -9,3 +9,4 @@
 [END] task=medium_s3_policy success=true steps=2 score=0.794 rewards=0.79,0.79
 
 [START] task=hard_iam_vpc env=aws-security-auditor model=Qwen/Qwen2.5-72B-Instruct
+[STEP] step=1 action=findings=7 reward=0.86 done=false error=null
