@@ -1,1 +1,2 @@
 [MODEL] Using meta-llama/Llama-3.1-8B-Instruct
+[START] task=easy_security_group env=aws-security-auditor model=meta-llama/Llama-3.1-8B-Instruct
