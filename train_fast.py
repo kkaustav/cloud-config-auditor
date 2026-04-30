@@ -10,7 +10,7 @@ from datasets import Dataset
 
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
 MODEL_NAME   = os.getenv("MODEL_NAME", "unsloth/Qwen2.5-3B-Instruct-bnb-4bit")
-OUTPUT_DIR   = os.getenv("OUTPUT_DIR", "./grpo_output")
+OUTPUT_DIR   = os.getenv("OUTPUT_DIR", "/content/cloud-config-auditor/grpo_output")
 MAX_SEQ_LEN  = 2048
 LORA_RANK    = 16
 CURRICULUM   = ["easy_security_group", "medium_s3_policy", "hard_iam_vpc"]
@@ -40,9 +40,31 @@ def parse_response(text):
         m = re.search(r'\{.*\}', text, re.DOTALL)
         try: data = json.loads(m.group()) if m else {}
         except: data = {}
+
+    # findings: handle both list of strings and list of dicts
+    raw_findings = data.get("findings", [])
+    if isinstance(raw_findings, list):
+        findings = []
+        for f in raw_findings:
+            if isinstance(f, dict):
+                findings.append(f.get("description", f.get("rule", str(f))))
+            elif isinstance(f, str):
+                findings.append(f)
+    else:
+        findings = []
+
+    # severity: handle both string and list
+    raw_sev = data.get("severity", [])
+    if isinstance(raw_sev, str):
+        severity = [raw_sev]
+    elif isinstance(raw_sev, list):
+        severity = [s.get("severity", s) if isinstance(s, dict) else s for s in raw_sev]
+    else:
+        severity = []
+
     return {
-        "findings":        data.get("findings", []) if isinstance(data.get("findings"), list) else [],
-        "severity":        data.get("severity", []) if isinstance(data.get("severity"), list) else [],
+        "findings":        findings,
+        "severity":        severity,
         "recommendations": data.get("recommendations", []) if isinstance(data.get("recommendations"), list) else [],
         "config_patch":    data.get("config_patch", {}) if isinstance(data.get("config_patch"), dict) else {},
     }
@@ -94,7 +116,7 @@ def evaluate(model, tokenizer, label, n=2):
                 task_scores.append(score)
                 print(f"  [{task}] run {i+1}: {score:.4f}")
             except Exception as e:
-                print(f"  [{task}] run {i+1}: error — {e}"); task_scores.append(0.0)
+                print(f"  [{task}] run {i+1}: error - {e}"); task_scores.append(0.0)
         scores[task] = round(sum(task_scores)/len(task_scores), 4)
         print(f"  [{task}] avg = {scores[task]:.4f}")
     return scores
@@ -102,7 +124,7 @@ def evaluate(model, tokenizer, label, n=2):
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     if not env_health(): print(f"❌ Environment not reachable at {ENV_BASE_URL}"); return
-    print(f"✅ Environment live")
+    print(f"✅ Environment live at {ENV_BASE_URL}")
 
     model, tokenizer = FastLanguageModel.from_pretrained(MODEL_NAME, max_seq_length=MAX_SEQ_LEN, dtype=None, load_in_4bit=True)
     model = FastLanguageModel.get_peft_model(model, r=LORA_RANK,
@@ -133,7 +155,7 @@ def main():
             max_completion_length=256,
             temperature=0.7,
             logging_steps=5,
-            save_steps=20,
+            save_steps=25,
             report_to="none",
             fp16=not torch.cuda.is_bf16_supported(),
             bf16=torch.cuda.is_bf16_supported(),
@@ -155,11 +177,11 @@ def main():
     print(f"{'Task':<30} {'Baseline':>10} {'Trained':>10} {'Delta':>10}")
     print("-"*62)
     for task in CURRICULUM:
-        b, t = baseline.get(task,0.0), trained.get(task,0.0)
+        b, t = baseline.get(task, 0.0), trained.get(task, 0.0)
         print(f"{task:<30} {b:>10.4f} {t:>10.4f} {'✅' if t>b else '⚠️'} {t-b:>+8.4f}")
 
-    with open(f"{OUTPUT_DIR}/training_comparison.json","w") as f:
+    with open(f"{OUTPUT_DIR}/training_comparison.json", "w") as f:
         json.dump({"baseline": baseline, "trained": trained}, f, indent=2)
-    print(f"\nComparison saved → {OUTPUT_DIR}/training_comparison.json\n✅ Done.")
+    print(f"\n✅ Done.")
 
 if __name__ == "__main__": main()
