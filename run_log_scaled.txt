@@ -80,3 +80,7 @@ For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/St
 
 You have depleted your monthly included credits. Purchase pre-paid credits to continue using Inference Providers. Alternatively, subscribe to PRO to get 20x more included usage.
 [STEP] step=4 action=findings=0 reward=0.01 done=false error="Client error '402 Payment Required' for url 'https://router.huggingface.co/v1/chat/completions' (Request ID: Root=1-69f3bcd4-59bdbad64dec07955cb146e7;a43045a0-c457-469d-b0f1-99e10c304160)\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402\n\nYou have depleted your monthly included credits. Purchase pre-paid credits to continue using Inference Providers. Alternatively, subscribe to PRO to get 20x more included usage."
+[ERROR] ask_llm failed at step 5: Client error '402 Payment Required' for url 'https://router.huggingface.co/v1/chat/completions' (Request ID: Root=1-69f3bcd5-6f3fd1fc5177ebfc2a084cfd;20b8a3fa-00af-4206-ac84-b820a946a637)
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+
+You have depleted your monthly included credits. Purchase pre-paid credits to continue using Inference Providers. Alternatively, subscribe to PRO to get 20x more included usage.
