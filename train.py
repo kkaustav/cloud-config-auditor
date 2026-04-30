@@ -188,8 +188,9 @@ def main():
             logging_steps=5,
             save_steps=25,
             report_to="none",
-            fp16=not torch.cuda.is_bf16_supported(),
-            bf16=torch.cuda.is_bf16_supported(),
+            # T4 FIX: disable mixed precision
+            fp16=False,                       # ← CHANGED: always False on T4
+            bf16=False,                       # ← CHANGED: T4 has no bfloat16
         ),
         train_dataset=dataset,
         reward_funcs=reward_wrapper,
