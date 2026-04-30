@@ -3,3 +3,4 @@
 [STEP] step=1 action=findings=3 reward=0.99 done=true error=null
 [END] task=easy_security_group success=true steps=1 score=0.990 rewards=0.99
 
+[START] task=medium_s3_policy env=aws-security-auditor model=meta-llama/Llama-3.1-8B-Instruct
