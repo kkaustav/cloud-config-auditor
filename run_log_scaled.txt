@@ -21,3 +21,6 @@
 [END] task=medium_lambda_iam success=true steps=1 score=0.955 rewards=0.95
 
 [START] task=hard_rds_cloudtrail env=aws-security-auditor model=Qwen/Qwen2.5-72B-Instruct
+[STEP] step=1 action=findings=14 reward=1.00 done=true error=null
+[END] task=hard_rds_cloudtrail success=true steps=1 score=1.000 rewards=1.00
+
