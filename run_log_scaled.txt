@@ -16,3 +16,7 @@
 [STEP] step=2 action=findings=10 reward=0.86 done=false error=null
 [STEP] step=3 action=findings=10 reward=0.64 done=false error=null
 [STEP] step=4 action=findings=8 reward=0.75 done=false error=null
+[STEP] step=5 action=findings=8 reward=0.86 done=true error=null
+[END] task=hard_iam_vpc success=true steps=5 score=0.858 rewards=0.75,0.86,0.64,0.75,0.86
+
+[START] task=medium_lambda_iam env=aws-security-auditor model=Qwen/Qwen2.5-72B-Instruct
