@@ -231,9 +231,8 @@ state = {
 }
 
 def score_response(task_name, findings, severity, recommendations, config_patch):
-    # Unknown task: minimum score per hackathon rules
     if task_name not in TASKS:
-        return 0.10
+        return 0.0
 
     expected = TASKS[task_name]["expected_findings"]
     agent_text = " ".join(str(x).lower() for x in (findings + recommendations))
@@ -243,10 +242,8 @@ def score_response(task_name, findings, severity, recommendations, config_patch)
         if any(kw.lower() in agent_text for kw in keyword_group):
             matched += 1
 
-    # Your original base score
     raw_score = matched / len(expected)
 
-    # Your original bonuses
     high_count = sum(1 for s in severity if str(s).upper() == "HIGH")
     if high_count >= 2 and raw_score > 0.5:
         raw_score = min(1.0, raw_score + 0.05)
@@ -254,18 +251,7 @@ def score_response(task_name, findings, severity, recommendations, config_patch)
     if isinstance(config_patch, dict) and len(config_patch) > 0:
         raw_score = min(1.0, raw_score + 0.03)
 
-    # HARD clamp only at the end:
-    #  - anything <= 0 becomes 0.10
-    #  - anything >= 1 becomes 0.99
-    #  - everything else stays as is
-    if raw_score <= 0.0:
-        final = 0.10
-    elif raw_score >= 1.0:
-        final = 0.99
-    else:
-        final = raw_score
-
-    return round(final, 3)
+    return round(min(raw_score, 0.99), 3)
 
 def build_feedback(task_name, findings, recommendations):
     expected = TASKS[task_name]["expected_findings"]
