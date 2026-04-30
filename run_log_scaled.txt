@@ -1,2 +1,6 @@
 [START] task=easy_security_group env=aws-security-auditor model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action=findings=6 reward=0.68 done=false error=null
+[STEP] step=2 action=findings=10 reward=0.68 done=false error=null
+[END] task=easy_security_group success=true steps=2 score=0.680 rewards=0.68,0.68
+
+[START] task=medium_s3_policy env=aws-security-auditor model=Qwen/Qwen2.5-72B-Instruct
