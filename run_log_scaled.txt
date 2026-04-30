@@ -8,3 +8,8 @@
 [END] task=medium_s3_policy success=true steps=1 score=0.950 rewards=0.95
 
 [START] task=hard_iam_vpc env=aws-security-auditor model=meta-llama/Llama-3.1-8B-Instruct
+[STEP] step=1 action=findings=11 reward=0.68 done=false error=null
+[ERROR] ask_llm failed at step 2: Client error '402 Payment Required' for url 'https://router.huggingface.co/v1/chat/completions' (Request ID: Root=1-69f3bcc1-41635c8320b73d917dbfc1d9;98e2bfd9-513c-477c-98d1-4e2036de87af)
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402
+
+You have depleted your monthly included credits. Purchase pre-paid credits to continue using Inference Providers. Alternatively, subscribe to PRO to get 20x more included usage.
