@@ -1,23 +1,30 @@
-import json
-import re
-import torch
-import requests
-import warnings
-
+%%writefile eval_all.py
+import json, re, os, torch, requests, warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", message=".*max_new_tokens.*max_length.*")
 
+from huggingface_hub import snapshot_download
 from unsloth import FastLanguageModel
+from peft import PeftModel
 
 BASE_URL = "https://kkaustav-cloud-config-auditor.hf.space"
+BASE_MODEL = "unsloth/Qwen2.5-3B-Instruct-bnb-4bit"
+ADAPTER_PATH = "/content/aws-auditor-sft-v5"
+
+if not os.path.exists(ADAPTER_PATH) or not os.path.exists(f"{ADAPTER_PATH}/adapter_config.json"):
+    print("⬇️ Downloading LoRA adapter...")
+    snapshot_download(repo_id="kkaustav/aws-security-auditor-lora", local_dir=ADAPTER_PATH)
+    print("✅ Adapter downloaded")
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name="kkaustav/aws-security-auditor-lora",
+    model_name=BASE_MODEL,
     max_seq_length=4096,
     dtype=None,
     load_in_4bit=True,
 )
+model = PeftModel.from_pretrained(model, ADAPTER_PATH)
 FastLanguageModel.for_inference(model)
+print("✅ Fine-tuned model loaded:", type(model))
 
 SYSTEM_DEFAULT = (
     "You are an expert AWS cloud security auditor. "
@@ -81,21 +88,20 @@ SYSTEM_IAM_VPC = (
     "9. PasswordPolicy.RequireSymbols=false — symbols not required (MEDIUM)\n"
     "10. PasswordPolicy.MaxPasswordAge=0 — passwords never expire (MEDIUM)\n"
     "11. PasswordPolicy.PasswordReusePrevention=0 — old passwords can be reused (MEDIUM)\n\n"
-    "=== SECTION 2: VPC findings — check each separately ===\n"
-    "12. VPC.FlowLogsEnabled=false — VPC Flow Logs are disabled, no traffic visibility (HIGH)\n"
-    "13. VPC.CloudTrailEnabled=false — CloudTrail is disabled, no API audit logging (CRITICAL)\n"
-    "14. VPC.GuardDutyEnabled=false — GuardDuty threat detection is not enabled (HIGH)\n"
-    "15. NetworkACL inbound rule: Protocol='-1', CidrBlock='0.0.0.0/0', Action='allow' — all inbound traffic permitted (HIGH)\n"
-    "16. NetworkACL outbound rule: Protocol='-1', CidrBlock='0.0.0.0/0', Action='allow' — all outbound traffic permitted (MEDIUM)\n"
-    "17. Subnet MapPublicIpOnLaunch=true — instances get public IPs automatically on launch (HIGH)\n\n"
-    "CRITICAL RULES:\n"
-    "- You MUST include findings from BOTH the IAMRole section AND the VPC section.\n"
-    "- Do NOT stop after IAM findings — continue to VPC findings 12-17.\n"
-    "- Each numbered item = one separate finding string.\n"
-    "- Do NOT group multiple items into one finding.\n"
-    "- Respond with valid JSON ONLY. No markdown. No code blocks.\n"
-    "- Your ENTIRE response must be ONE complete, closed JSON object.\n"
-    "- severity array length must EXACTLY match findings array length.\n\n"
+    "=== SECTION 2: VPC findings — MANDATORY, check each separately ===\n"
+    "12. VPC.FlowLogsEnabled=false — VPC Flow Logs are disabled (HIGH)\n"
+    "13. VPC.CloudTrailEnabled=false — CloudTrail is disabled (CRITICAL)\n"
+    "14. VPC.GuardDutyEnabled=false — GuardDuty not enabled (HIGH)\n"
+    "15. NetworkACL inbound rule: Protocol='-1', CidrBlock='0.0.0.0/0', Action='allow' (HIGH)\n"
+    "16. NetworkACL outbound rule: Protocol='-1', CidrBlock='0.0.0.0/0', Action='allow' (MEDIUM)\n"
+    "17. Subnet MapPublicIpOnLaunch=true — public IPs auto-assigned (HIGH)\n\n"
+    "ABSOLUTE RULES:\n"
+    "- You MUST produce EXACTLY 17 findings — 11 IAM + 6 VPC.\n"
+    "- Do NOT stop at finding 11. Continue to findings 12-17.\n"
+    "- findings array length MUST be 17.\n"
+    "- severity array length MUST be 17.\n"
+    "- recommendations array length MUST be 17.\n"
+    "- Return valid JSON ONLY. No markdown. No code blocks.\n\n"
     '{"findings":['
     '"IAM role trust policy allows any AWS service to assume it — Principal.Service is wildcard (*)",'
     '"Inline policy AllAccess-temp grants Action=* — full administrative access",'
@@ -200,14 +206,7 @@ def repair_json(text):
             return {"findings": items, "severity": [], "recommendations": [], "config_patch": {}}
     return None
 
-def run_task(task, run_num, debug=False):
-    try:
-        reset_resp = requests.post(f"{BASE_URL}/reset?task={task}", timeout=30).json()
-    except Exception as e:
-        print(f"  {task} run {run_num}: RESET ERROR — {e}")
-        return 0.0
-    obs = reset_resp.get("observation", {})
-    config_text = obs["config"] if isinstance(obs, dict) and "config" in obs else str(obs)
+def generate_response(config_text, task):
     system_prompt = SYSTEM_MAP.get(task, SYSTEM_DEFAULT)
     messages = [
         {"role": "system", "content": system_prompt},
@@ -226,27 +225,43 @@ def run_task(task, run_num, debug=False):
             pad_token_id=tokenizer.pad_token_id,
             eos_token_id=tokenizer.eos_token_id,
         )
-    response_text = tokenizer.decode(
-        outputs[0][inputs.shape[1]:], skip_special_tokens=True
-    ).strip()
+    return tokenizer.decode(outputs[0][inputs.shape[1]:], skip_special_tokens=True).strip()
+
+def run_task(task, run_num, debug=False):
+    for attempt in range(3):
+        try:
+            reset_resp = requests.post(f"{BASE_URL}/reset?task={task}", timeout=30).json()
+            obs = reset_resp.get("observation", {})
+            config_text = obs["config"] if isinstance(obs, dict) and "config" in obs else str(obs)
+            if config_text and len(config_text) > 10:
+                break
+        except Exception as e:
+            if attempt == 2:
+                print(f"  {task} run {run_num}: RESET ERROR — {e}")
+                return 0.0
+
+    response_text = generate_response(config_text, task)
     parsed = repair_json(response_text)
+
     if parsed is None:
         print(f"  {task} run {run_num}: PARSE FAIL — raw: {response_text[:120]}")
         return 0.0
+
     if debug:
         print(f"\n  [DEBUG] {task} findings ({len(parsed.get('findings', []))} total):")
         for i, f in enumerate(parsed.get("findings", [])):
             print(f"    {i+1}. {f}")
+
     try:
         step = requests.post(f"{BASE_URL}/step", json=parsed, timeout=30).json()
         if debug:
-            print(f"\n  [DEBUG] scorer response: {json.dumps(step, indent=2)[:800]}")
+            print(f"\n  [DEBUG] reward: {step.get('reward', 'N/A')}")
     except Exception as e:
         print(f"  {task} run {run_num}: STEP ERROR — {e}")
         return 0.0
+
     reward = step.get("reward", 0.0)
-    findings = len(parsed.get("findings", []))
-    print(f"  {task} run {run_num}: {reward:.4f}  ({findings} findings)")
+    print(f"  {task} run {run_num}: {reward:.4f}  ({len(parsed.get('findings', []))} findings)")
     return reward
 
 tasks = [
@@ -261,8 +276,6 @@ DEBUG_TASKS = {"hard_iam_vpc"}
 
 print("=" * 50)
 all_scores = {}
-log_lines = ["=" * 50, "FINAL SCORES".center(50), "=" * 50]
-
 for task in tasks:
     scores = [run_task(task, i, debug=(task in DEBUG_TASKS and i == 1)) for i in range(1, 4)]
     avg = sum(scores) / 3
@@ -274,16 +287,15 @@ print(f"{'FINAL SCORES':^50}")
 print("=" * 50)
 for task, score in all_scores.items():
     bar = "█" * int(score * 20)
-    line = f"{task:<30} {score:.4f}  {bar}"
-    print(line)
-    log_lines.append(line)
+    print(f"{task:<30} {score:.4f}  {bar}")
 
 overall = sum(all_scores.values()) / len(all_scores)
-overall_line = f"\nOVERALL AVERAGE: {overall:.4f}"
-print(overall_line)
-log_lines.append(overall_line)
+print(f"\nOVERALL AVERAGE: {overall:.4f}")
 
-with open("/content/cloud-config-auditor/run_log_scaled.txt", "w") as f:
-    f.write("\n".join(log_lines))
-
-print("\n✅ run_log_scaled.txt saved to repo!")
+repo_path = "/content/cloud-config-auditor"
+log_path = os.path.join(repo_path, "run_log_scaled.txt")
+with open(log_path, "w") as f:
+    for task, score in all_scores.items():
+        f.write(f"{task}: {score:.4f}\n")
+    f.write(f"OVERALL: {overall:.4f}\n")
+print(f"\n✅ run_log_scaled.txt saved to repo!")
