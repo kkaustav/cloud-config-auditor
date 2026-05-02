@@ -128,3 +128,10 @@ Scores are strictly between 0 and 1, keeping the environment compatible with Ope
 ---
 
 ## Project Structure
+├── environment.py # FastAPI environment implementation
+├── tasks.py # Task definitions and grader logic
+├── inference.py # Baseline LLM-driven agent
+├── agent.py # Runner entry point
+├── openenv.yaml # OpenEnv endpoint configuration
+├── Dockerfile # Container setup for deployment
+└── requirements.txt # Python dependencies
