@@ -171,3 +171,41 @@ python3 inference.py
 ---
 
 ## Real Benchmark Run Output
+
+==================================================
+easy_security_group run 1: 0.9900 (3 findings)
+easy_security_group run 2: 0.9900 (3 findings)
+easy_security_group run 3: 0.9900 (3 findings)
+>>> easy_security_group AVG: 0.9900
+
+medium_s3_policy run 1: 0.9900 (6 findings)
+medium_s3_policy run 2: 0.9900 (6 findings)
+medium_s3_policy run 3: 0.9900 (6 findings)
+>>> medium_s3_policy AVG: 0.9900
+
+medium_lambda_iam run 1: 0.9900 (11 findings)
+medium_lambda_iam run 2: 0.9900 (11 findings)
+medium_lambda_iam run 3: 0.9900 (11 findings)
+>>> medium_lambda_iam AVG: 0.9900
+
+hard_rds_cloudtrail run 1: 0.9200 (13 findings)
+hard_rds_cloudtrail run 2: 0.9200 (13 findings)
+hard_rds_cloudtrail run 3: 0.9200 (13 findings)
+>>> hard_rds_cloudtrail AVG: 0.9200
+
+hard_iam_vpc run 1: 0.8200 (17 findings)
+hard_iam_vpc run 2: 0.8200 (17 findings)
+hard_iam_vpc run 3: 0.8200 (17 findings)
+>>> hard_iam_vpc AVG: 0.8200
+
+==================================================
+FINAL SCORES
+==================================================
+easy_security_group 0.9900 ███████████████████
+medium_s3_policy 0.9900 ███████████████████
+medium_lambda_iam 0.9900 ███████████████████
+hard_rds_cloudtrail 0.9200 ██████████████████
+hard_iam_vpc 0.8200 ████████████████
+==================================================
+OVERALL AVERAGE: 0.9420
+
