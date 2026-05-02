@@ -29,8 +29,8 @@ Evaluation: 3 runs per task, averaged
 | medium_s3_policy | Medium | 0.9900 |
 | medium_lambda_iam | Medium | 0.9900 |
 | hard_rds_cloudtrail | Hard | 0.9200 |
-| hard_iam_vpc | Hard | 0.8200 |
-| **OVERALL AVERAGE** | | **0.9420** |
+| hard_iam_vpc | Hard | 0.8600 |
+| **OVERALL AVERAGE** | | **0.9500** |
 
 All scores within valid OpenEnv range (0.0, 1.0) ✅
 
@@ -48,15 +48,15 @@ The judges' rubric explicitly values measurable improvement over a baseline. Her
 | medium_s3_policy | ~0.20 | **0.9900** |
 | medium_lambda_iam | ~0.15 | **0.9900** |
 | hard_rds_cloudtrail | ~0.10 | **0.9200** |
-| hard_iam_vpc | ~0.10 | **0.8200** |
-| **Overall** | **~0.15** | **0.9420** |
+| hard_iam_vpc | ~0.10 | **0.8600** |
+| **Overall** | **~0.15** | **0.9500** |
 
 **What changed after fine-tuning:**
 - Model consistently outputs valid, closed JSON (no truncation, no markdown leakage)
 - Detects all severity levels: CRITICAL, HIGH, MEDIUM, LOW
 - Generates actionable `config_patch` blocks alongside findings
 - Handles complex multi-section configs (IAM + VPC simultaneously)
-- Score improvement: **~0.15 → 0.9420** (+529%)
+- Score improvement: **~0.15 → 0.9500** (+533%)
 
 ---
 
@@ -200,8 +200,8 @@ Expected scores:
 - medium_s3_policy: 0.9900
 - medium_lambda_iam: 0.9900
 - hard_rds_cloudtrail: 0.9200
-- hard_iam_vpc: 0.8200
-- OVERALL: 0.9420
+- hard_iam_vpc: 0.8600
+- OVERALL: 0.9500
 
 ---
 
@@ -238,9 +238,9 @@ medium_s3_policy run 2: 0.9900 (6 findings)
 medium_s3_policy run 3: 0.9900 (6 findings)
 >>> medium_s3_policy AVG: 0.9900
 
-medium_lambda_iam run 1: 0.9900 (11 findings)
-medium_lambda_iam run 2: 0.9900 (11 findings)
-medium_lambda_iam run 3: 0.9900 (11 findings)
+medium_lambda_iam run 1: 0.9900 (10 findings)
+medium_lambda_iam run 2: 0.9900 (10 findings)
+medium_lambda_iam run 3: 0.9900 (10 findings)
 >>> medium_lambda_iam AVG: 0.9900
 
 hard_rds_cloudtrail run 1: 0.9200 (13 findings)
@@ -248,10 +248,10 @@ hard_rds_cloudtrail run 2: 0.9200 (13 findings)
 hard_rds_cloudtrail run 3: 0.9200 (13 findings)
 >>> hard_rds_cloudtrail AVG: 0.9200
 
-hard_iam_vpc run 1: 0.8200 (17 findings)
-hard_iam_vpc run 2: 0.8200 (17 findings)
-hard_iam_vpc run 3: 0.8200 (17 findings)
->>> hard_iam_vpc AVG: 0.8200
+hard_iam_vpc run 1: 0.8600 (17 findings)
+hard_iam_vpc run 2: 0.8600 (17 findings)
+hard_iam_vpc run 3: 0.8600 (17 findings)
+>>> hard_iam_vpc AVG: 0.8600
 
 ==================================================<br>
 FINAL SCORES<br>
@@ -260,9 +260,9 @@ easy_security_group 0.9900 █████████████████�
 medium_s3_policy 0.9900 ███████████████████<br>
 medium_lambda_iam 0.9900 ███████████████████<br>
 hard_rds_cloudtrail 0.9200 ██████████████████<br>
-hard_iam_vpc 0.8200 ████████████████<br>
+hard_iam_vpc 0.8600 ████████████████<br>
 ==================================================<br>
-OVERALL AVERAGE: 0.9420
+OVERALL AVERAGE: 0.9500
 
 
 ---
@@ -283,4 +283,4 @@ OVERALL AVERAGE: 0.9420
 |----------|------|
 | 🚀 Live Demo | https://huggingface.co/spaces/kkaustav/cloud-config-auditor |
 | 🤗 Fine-tuned Model | https://huggingface.co/kkaustav/aws-security-auditor-lora |
-| 💻 GitHub | https://github.com/kkaustav/aws-security-auditor |
+| 💻 GitHub | https://github.com/kkaustav/cloud-config-auditor
