@@ -152,13 +152,14 @@ Scores are strictly between 0 and 1, keeping the environment compatible with Ope
 ---
 
 ## Project Structure
-├── environment.py # FastAPI environment implementation<br>
-├── tasks.py # Task definitions and grader logic<br>
-├── inference.py # Baseline LLM-driven agent<br>
-├── agent.py # Runner entry point<br>
-├── openenv.yaml # OpenEnv endpoint configuration<br>
-├── Dockerfile # Container setup for deployment<br>
-└── requirements.txt # Python dependencies
+├── environment.py     # FastAPI environment implementation<br>
+├── tasks.py           # Task definitions and grader logic<br>
+├── inference.py       # Baseline LLM-driven agent<br>
+├── agent.py           # Runner entry point<br>
+├── eval_all.py        # Evaluation runner (used in Colab steps)<br>
+├── openenv.yaml       # OpenEnv endpoint configuration<br>
+├── Dockerfile         # Container setup for deployment<br>
+└── requirements.txt   # Python dependencies
 
 
 ---
