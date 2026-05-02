@@ -1,4 +1,3 @@
-%%writefile eval_all.py
 import json, re, os, torch, requests, warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", message=".*max_new_tokens.*max_length.*")
