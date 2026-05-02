@@ -36,7 +36,6 @@ All scores within valid OpenEnv range (0.0, 1.0) ✅
 
 ---
 
-
 ## Before/After Demo
 
 The judges' rubric explicitly values measurable improvement over a baseline. Here is the direct comparison between an untuned base model and our fine-tuned model on the same AWS configs.
@@ -77,16 +76,16 @@ Unlike generic ML benchmarks, this environment is grounded in real AWS productio
 
 ## Architecture
 Agent (inference.py)<br>
- │<br>
+│<br>
 ▼ HTTP (POST /reset, /step)<br>
 FastAPI Environment (environment.py)<br>
- │<br>
+│<br>
 ▼
 Task Grader (tasks.py)<br>
- │<br>
+│<br>
 ▼
 Reward Score (0.0 – 1.0)<br>
- │<br>
+│<br>
 ▼
 Agent receives reward → decides next action
 
@@ -172,6 +171,37 @@ Scores are strictly between 0 and 1, keeping the environment compatible with Ope
 | `MODEL_NAME` | `Qwen/Qwen2.5-72B-Instruct` | No |
 | `API_BASE_URL` | `https://router.huggingface.co/v1` | No |
 | `ENV_BASE_URL` | `http://localhost:7860` | No |
+
+---
+
+## How to Run Evaluation
+
+Run the following cells in a Colab notebook with T4 GPU:
+
+\```python
+# Cell 1 — Install dependencies
+!pip install unsloth peft huggingface_hub -q
+\```
+
+\```python
+# Cell 2 — Clone repo
+!git clone https://github.com/kkaustav/cloud-config-auditor /content/cloud-config-auditor
+\```
+
+\```python
+# Cell 3 — Run eval (model auto-downloads, no setup needed)
+import os
+os.chdir("/content/cloud-config-auditor")
+%run eval_all.py
+\```
+
+Expected scores:
+- easy_security_group: 0.9900
+- medium_s3_policy: 0.9900
+- medium_lambda_iam: 0.9900
+- hard_rds_cloudtrail: 0.9200
+- hard_iam_vpc: 0.8200
+- OVERALL: 0.9420
 
 ---
 
