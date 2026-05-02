@@ -51,8 +51,19 @@ Unlike generic ML benchmarks, this environment is grounded in real AWS productio
 ---
 
 ## Architecture
-
-
+Agent (inference.py)<br>
+│<br>
+▼ HTTP (POST /reset, /step)<br>
+FastAPI Environment (environment.py)<br>
+│<br>
+▼
+Task Grader (tasks.py)<br>
+│<br>
+▼
+Reward Score (0.0 – 1.0)<br>
+│<br>
+▼
+Agent receives reward → decides next action
 
 
 The agent operates in a standard observe → act → reward loop. On each `/step`, the agent submits a structured audit response. The grader evaluates it against a weighted rubric and returns a scalar reward.
