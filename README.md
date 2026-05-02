@@ -51,3 +51,17 @@ Unlike generic ML benchmarks, this environment is grounded in real AWS productio
 ---
 
 ## Architecture
+Agent (inference.py)
+│
+▼ HTTP (POST /reset, /step)
+FastAPI Environment (environment.py)
+│
+▼
+Task Grader (tasks.py)
+│
+▼
+Reward Score (0.0 – 1.0)
+│
+▼
+Agent receives reward → decides next action
+
