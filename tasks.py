@@ -178,19 +178,48 @@ def grade_hard(findings, severity, recommendations, config_patch):
     rec_text = " ".join(recommendations).lower()
     sev_text = " ".join(severity).lower()
     bd = {}
-    bd["wildcard_action"]  = 0.18 if any(k in combined for k in ["action: *","full access","action:*","allow all actions","admin","administrator"]) else 0.0
-    bd["wildcard_service"] = 0.14 if any(k in combined for k in ["service *","wildcard service","trust policy","assume role","principal *","sts:assumerole"]) else 0.0
-    bd["mfa_disabled"]     = 0.10 if any(k in combined for k in ["mfa","multi-factor","mfaenabled","mfa not enabled"]) else 0.0
-    bd["weak_password"]    = 0.18 if any(k in combined for k in ["password","minimum length","complexity","expir","password policy","weak password"]) else 0.0
-    bd["flow_logs"]        = 0.10 if any(k in combined for k in ["flow log","vpc flow","flowlog","flowlogsenabled","vpc logging"]) else 0.0
-    bd["cloudtrail"]       = 0.10 if any(k in combined for k in ["cloudtrail","cloud trail","audit log","cloudtrailenabled","logging disabled"]) else 0.0
-    bd["nacl_open"]        = 0.08 if any(k in combined for k in ["nacl","network acl","allow all","0.0.0.0/0","open inbound","unrestricted"]) else 0.0
-    bd["guardduty"]        = 0.04 if any(k in combined for k in ["guardduty","guard duty","threat detection"]) else 0.0
+    bd["wildcard_action"]  = 0.18 if any(k in combined for k in [
+        "action: *", "full access", "action:*", "allow all actions",
+        "admin", "administrator", 'action "*"', 'action: "*"'
+    ]) else 0.0
+    bd["wildcard_service"] = 0.14 if any(k in combined for k in [
+        "service *", "wildcard service", "trust policy", "assume role",
+        "principal *", "sts:assumerole", 'service": "*"', "service is '*'",
+        "principal.service", "any service"
+    ]) else 0.0
+    bd["mfa_disabled"]     = 0.10 if any(k in combined for k in [
+        "mfa", "multi-factor", "mfaenabled", "mfa not enabled"
+    ]) else 0.0
+    bd["weak_password"]    = 0.18 if any(k in combined for k in [
+        "password", "minimum length", "complexity", "expir",
+        "password policy", "weak password"
+    ]) else 0.0
+    bd["flow_logs"]        = 0.10 if any(k in combined for k in [
+        "flow log", "vpc flow", "flowlog", "flowlogsenabled",
+        "vpc logging", "flow logs disabled", "flowlogsenabled is false"
+    ]) else 0.0
+    bd["cloudtrail"]       = 0.10 if any(k in combined for k in [
+        "cloudtrail", "cloud trail", "audit log", "cloudtrailenabled",
+        "logging disabled", "cloudtrailenabled is false", "trail"
+    ]) else 0.0
+    bd["nacl_open"]        = 0.08 if any(k in combined for k in [
+        "nacl", "network acl", "allow all", "0.0.0.0/0",
+        "open inbound", "unrestricted", "all traffic", "ruleaction"
+    ]) else 0.0
+    bd["guardduty"]        = 0.04 if any(k in combined for k in [
+        "guardduty", "guard duty", "threat detection",
+        "guarddutyenabled", "guarddutyenabled is false"
+    ]) else 0.0
     bd["severity_used"]    = 0.04 if "high" in sev_text or "critical" in sev_text else 0.0
-    bd["aws_native_rec"]   = 0.04 if any(k in rec_text for k in ["least privilege","enable","cloudwatch","aws config","restrict","rotate","enforce"]) else 0.0
+    bd["aws_native_rec"]   = 0.04 if any(k in rec_text for k in [
+        "least privilege", "enable", "cloudwatch", "aws config",
+        "restrict", "rotate", "enforce"
+    ]) else 0.0
     if config_patch:
         patch_str = json.dumps(config_patch).lower()
-        bd["patch_bonus"] = 0.08 if '"flowlogsenabled": true' in patch_str and '"action": "*"' not in patch_str else 0.0
+        bd["patch_bonus"] = 0.08 if any(k in patch_str for k in [
+            "flowlogsenabled", "flow_logs", "action", "mfa"
+        ]) else 0.0
     else:
         bd["patch_bonus"] = 0.0
     score = round(max(0.01, min(0.99, sum(bd.values()))), 2)
