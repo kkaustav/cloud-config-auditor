@@ -1,6 +1,10 @@
-INFO:     Started server process [91995]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-ERROR:    [Errno 48] error while attempting to bind on address ('0.0.0.0', 7860): [errno 48] address already in use
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
+==================================================
+                   FINAL SCORES                   
+==================================================
+easy_security_group            0.9900  ███████████████████
+medium_s3_policy               0.9900  ███████████████████
+medium_lambda_iam              0.9900  ███████████████████
+hard_rds_cloudtrail            0.9200  ██████████████████
+hard_iam_vpc                   0.8200  ████████████████
+
+OVERALL AVERAGE: 0.9420
