@@ -65,3 +65,66 @@ Reward Score (0.0 – 1.0)
 ▼
 Agent receives reward → decides next action
 
+
+The agent operates in a standard observe → act → reward loop. On each `/step`, the agent submits a structured audit response. The grader evaluates it against a weighted rubric and returns a scalar reward.
+
+---
+
+## Tasks
+
+| Task | Description |
+|------|-------------|
+| `easy_security_group` | Reviews a production web-tier Security Group for risky internet-exposed inbound rules (SSH, RDP) |
+| `medium_s3_policy` | Audits an S3 bucket for public access, missing encryption, suspended versioning, and overly permissive bucket policies |
+| `medium_lambda_iam` | Audits a Lambda function for plaintext secrets, wildcard IAM, missing VPC isolation, and unauthenticated function URLs |
+| `hard_rds_cloudtrail` | Reviews RDS instance and CloudTrail for public exposure, unencrypted storage, disabled backups, and missing audit logging |
+| `hard_iam_vpc` | Reviews IAM roles and VPC settings for wildcard permissions, weak password policy, disabled MFA, missing Flow Logs, and open NACLs |
+
+---
+
+## Reward Design
+
+Each task uses a weighted reward breakdown for important security signals. Examples include:
+
+- SSH or RDP exposure
+- Public S3 access
+- Wildcard IAM permissions (`Action:*`)
+- Disabled VPC Flow Logs, CloudTrail, or GuardDuty
+- Weak password policy and missing MFA
+- Plaintext secrets in environment variables
+
+Scores are strictly between 0 and 1, keeping the environment compatible with OpenEnv evaluation rules.
+
+---
+
+## Scoring Breakdown
+
+| Component | Easy | Medium | Hard |
+|-----------|------|--------|------|
+| SSH/RDP detection | 0.55 | — | — |
+| Internet exposure | 0.25 | — | — |
+| Public access | — | 0.20 | — |
+| Encryption | — | 0.20 | — |
+| Wildcard IAM Action | — | — | 0.18 |
+| Weak password / MFA | — | — | 0.28 |
+| Logging & GuardDuty | — | — | 0.24 |
+| Remediation quality | 0.15 | 0.05 | 0.04 |
+| Config patch bonus | 0.10 | 0.05 | 0.08 |
+
+---
+
+## API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `/reset` | Initialise or reset the environment for a new episode |
+| `/step` | Submit an agent action and receive a reward |
+| `/state` | Retrieve the current environment state |
+| `/health` | Liveness check |
+| `/schema` | Action and observation schema |
+| `/metadata` | Task and environment metadata |
+| `/mcp` | Model context protocol endpoint |
+
+---
+
+## Project Structure
