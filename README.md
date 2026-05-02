@@ -135,3 +135,39 @@ Scores are strictly between 0 and 1, keeping the environment compatible with Ope
 ├── openenv.yaml # OpenEnv endpoint configuration
 ├── Dockerfile # Container setup for deployment
 └── requirements.txt # Python dependencies
+
+
+---
+
+## Environment Variables
+
+| Variable | Default | Required |
+|----------|---------|----------|
+| `HF_TOKEN` | — | ✅ |
+| `MODEL_NAME` | `Qwen/Qwen2.5-72B-Instruct` | No |
+| `API_BASE_URL` | `https://router.huggingface.co/v1` | No |
+| `ENV_BASE_URL` | `http://localhost:7860` | No |
+
+---
+
+## How to Run Locally
+
+Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+Start the environment:
+```bash
+uvicorn environment:app --host 0.0.0.0 --port 7860
+```
+
+In another terminal, run the agent:
+```bash
+export HF_TOKEN=YOUR_TOKEN
+python3 inference.py
+```
+
+---
+
+## Real Benchmark Run Output
