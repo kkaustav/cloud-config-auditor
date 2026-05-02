@@ -209,3 +209,23 @@ hard_iam_vpc 0.8200 ████████████████
 ==================================================
 OVERALL AVERAGE: 0.9420
 
+
+---
+
+## Limitations and Future Work
+
+- The current grader uses rule-based pattern matching; future versions could incorporate LLM-as-judge scoring for more nuanced remediation evaluation
+- Task configurations are static; dynamic config generation with randomised misconfiguration injection would improve generalisation
+- Multi-step agent memory across tasks is not yet implemented — each task resets independently
+- Adding CIS Benchmark or AWS Foundational Security Best Practices alignment would make scoring auditable against industry standards
+- Expanding to additional AWS services (Lambda permissions, RDS snapshots, KMS key policies) is a natural next step
+
+---
+
+## Links
+
+| Resource | Link |
+|----------|------|
+| 🚀 Live Demo | https://huggingface.co/spaces/kkaustav/cloud-config-auditor |
+| 🤗 Fine-tuned Model | https://huggingface.co/kkaustav/aws-security-auditor-lora |
+| 💻 GitHub | https://github.com/kkaustav/aws-security-auditor |
